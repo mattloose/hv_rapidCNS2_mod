@@ -4,9 +4,11 @@ It takes an aligned bam of ONT data, runs epi2me-labs wf-human-variation to gene
 
 Outputs from wf-human-variation are then analysed using Rapid-CNS2 to generate the final report.
 
-Input BAM file *MUST* contain methylation data (MM:Z tags) otherwise methylation related outputs of Rapid-CNS2 will be incorrect/gibberish. The workflow should ERROR if MM:Z tags are not present.
+Input BAM file **MUST** contain methylation data (MM:Z tags) otherwise methylation related outputs of Rapid-CNS2 will be incorrect/gibberish. The workflow should ERROR if MM:Z tags are not present.
 
 The provided reference should be the same reference used to align reads in the input BAM.
+
+At present, it relies upon the *outdir* being within the current working directory. Setting a full path to some other location will cause errors.
 
 ### Requirements:
 ```
@@ -31,7 +33,7 @@ nextflow pull graemefox/hv_rapidCNS2
 
 SAMPLE=sample_01
 PATIENT=JohnDoe
-OUTPUT_DIR=/path/to/directory/${SAMPLE}_output
+OUTPUT_DIR=${SAMPLE}_output
 
 ## run the pipeline
 
