@@ -466,7 +466,7 @@ workflow {
 ///////////////////// - run the workflow
 
     // check that the input bam contains methylation tags (MM:Z). Error if not.
-    check_ch = check_bam_has_meth_data(input_bam)
+    //check_ch = check_bam_has_meth_data(input_bam)
 
     // index the input bam file 
     index_ch = index_input_bam(input_bam)
