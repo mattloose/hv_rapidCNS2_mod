@@ -34,6 +34,8 @@ nextflow pull graemefox/hv_rapidCNS2
 SAMPLE=sample_01
 PATIENT=JohnDoe
 OUTPUT_DIR=${SAMPLE}_output
+BAM=my_data.bam
+REFERENCE=my_reference.fa.gz
 
 ## run the pipeline
 
@@ -42,9 +44,9 @@ nextflow run graemefox/hv_rapidCNS2 \
 -with-report ${OUTPUT_DIR}/${SAMPLE}_nextflow_report.html \
 --sample ${SAMPLE} \
 --patient ${PATIENT} \
---bam aligned_meth_data.bam \
+--bam ${BAM} \
 --outdir ${OUTPUT_DIR} \
---reference my_reference.fa.gz \
+--reference ${REFERENCE} \
 --threads 64
 
 ```
