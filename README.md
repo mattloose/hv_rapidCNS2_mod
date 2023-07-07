@@ -4,7 +4,7 @@ It takes an aligned bam of ONT data, runs epi2me-labs wf-human-variation to gene
 
 Outputs from wf-human-variation are then analysed using Rapid-CNS2 to generate the final report.
 
-Input BAM file **MUST** contain methylation data (MM:Z tags) otherwise methylation related outputs of Rapid-CNS2 will be incorrect/gibberish. The workflow should ERROR if MM:Z tags are not present.
+Input BAM file **MUST** contain methylation data (MM:Z tags). The workflow should ERROR if MM:Z tags are not present.
 
 The provided reference should be the same reference used to align reads in the input BAM.
 
