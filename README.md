@@ -29,7 +29,7 @@ nextflow pull graemefox/hv_rapidCNS2
 
 ### Example command:
 ```
-## define sample name, ID and output directory:
+## define sample name, ID and output directory, input BAM and reference genome:
 
 SAMPLE=sample_01
 PATIENT=JohnDoe
