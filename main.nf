@@ -24,6 +24,19 @@ log.info """\
         """
         .stripIndent()
 
+process check_bam_has_meth_data {
+    input:
+        path(input_bam)
+    
+    output:
+        stdout emit: meth_check
+
+    script:
+        """
+        samtools view ${input_bam} | grep -m 1 MM:Z
+        """
+}
+
 process index_input_bam {
     input:
         path(input_bam)
@@ -451,6 +464,10 @@ workflow {
     .set {report_UKHD}
 
 ///////////////////// - run the workflow
+
+    // check that the input bam contains methylation tags (MM:Z). Error if not.
+    check_ch = check_bam_has_meth_data(input_bam)
+
     // index the input bam file 
     index_ch = index_input_bam(input_bam)
 
