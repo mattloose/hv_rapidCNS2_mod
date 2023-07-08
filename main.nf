@@ -2,7 +2,7 @@
 nextflow.enable.dsl=2
 
 // default email val in null. specifying it will override.
-params.email = null
+//params.email = null
 
 // set up and create an output directory
 outdir = file(params.outdir)
