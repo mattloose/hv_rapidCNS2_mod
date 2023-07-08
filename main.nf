@@ -1,6 +1,9 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
+// default email val in null. specifying it will override.
+params.email = null
+
 // set up and create an output directory
 outdir = file(params.outdir)
 outdir.mkdir()
@@ -398,6 +401,18 @@ process make_report {
         """
 }
 
+// this not working at the moment https://www.nextflow.io/docs/latest/config.html
+process email_reports {
+    input:
+        val(email)
+    output:
+
+    script:
+        """
+        echo "An email" | mail -s "An email" ${email}
+        """
+}
+
 ///////////////////////////
 // MAIN WORKFLOW SECTION //
 ///////////////////////////
@@ -464,9 +479,8 @@ workflow {
     .set {report_UKHD}
 
 ///////////////////// - run the workflow
-
-    // check that the input bam contains methylation tags (MM:Z). Error if not.
-    //check_ch = check_bam_has_meth_data(input_bam)
+    // check input bam file for methylation tags
+    check_ch = check_bam_has_meth_data(input_bam)
 
     // index the input bam file 
     index_ch = index_input_bam(input_bam)
@@ -518,4 +532,9 @@ workflow {
 
     // collect data and generate final report
     make_report(makereport, cnvpytor.out, mgmt_pred.out, meth_classification.out, filter_report.out, sample, report_UKHD, mosdepth_ch.mosdepth_out)
+
+    // check for email param, and send out reports if present
+    //if (params.email != null) {
+    //    email_reports(params.email)
+    //}
 }
