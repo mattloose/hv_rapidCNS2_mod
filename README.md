@@ -40,7 +40,7 @@ REFERENCE=my_reference.fa.gz
 
 ## run the pipeline
 
-nextflow run hv_rapidCNS2/main.nf2 \
+nextflow run hv_rapidCNS2/main.nf \
 -with-docker graefox/rapid_cns2:latest \
 -with-report ${OUTPUT_DIR}/${SAMPLE}_nextflow_report.html \
 --sample ${SAMPLE} \
