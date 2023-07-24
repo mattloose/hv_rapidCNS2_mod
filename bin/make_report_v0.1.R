@@ -28,7 +28,9 @@ option_list = list(
               help="sample", metavar="character"),
   make_option(c("-t", "--mgmt"), type="character", default=NULL,
               help="mgmt prediction", metavar="character"),
-  ## following option added by GF
+  ## following options added by GF
+  make_option(c("-a", "--methylartist"), type="character", default=NULL,
+              help="methylartist mgmt plot", metavar="character"),
   make_option(c("-u", "--report_UKHD"), type="character", default=NULL,
               help="report_UKHD R markdown doc", metavar="character")
 )
@@ -45,6 +47,7 @@ mgmt<- opt$mgmt
 sample <- opt$sample
 # add option for report_UKHD above
 report_UKHD <- opt$report_UKHD
+methylartist_plot <- opt$methylartist
 
 #render("/Rapid_CNS2_report_UKHD.Rmd", 
 render(report_UKHD, 

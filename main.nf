@@ -53,6 +53,24 @@ process index_input_bam {
         """
 }
 
+process draw_mgmt_methylartist {
+    input:
+        path(indexed_bam)
+        path(bam)
+        path(reference)
+        val(params.outdir)
+    
+    output:
+        path "*.png", emit: mgmt_plot
+
+    //publishDir("${params.outdir}")
+
+    script:
+        """
+        methylartist locus -i chr10:129466536-129467536 -b ${bam} --ref ${reference} --motif CG
+        """
+}
+
 process mosdepth {
     input:
         val(threads)
@@ -286,6 +304,8 @@ process bedtools_intersect2 {
         val(ext)
         val(sample)
 
+    publishDir("${params.outdir}")
+
     output:   
         path "*.bed", emit: intersect_bed
         
@@ -379,6 +399,7 @@ process make_report {
         val(sample)
         path(report_UKHD)
         path(mosdepth_plot_data) // mosdepth
+        path(methylartist_plot)
     
     output:
 
@@ -397,7 +418,8 @@ process make_report {
             --coverage ${PWD}/${params.outdir}/${sample}.mosdepth.summary.txt \
             --sample ${sample} \
             --mgmt ${PWD}/${params.outdir}/${sample}_mgmt_status.csv \
-            --report_UKHD ${report_UKHD}
+            --report_UKHD ${report_UKHD} \
+            --methylartist ${methylartist_plot}
         """
 }
 
@@ -485,6 +507,9 @@ workflow {
     // index the input bam file 
     index_ch = index_input_bam(input_bam)
 
+    // methylartist mgmt plot
+    methyl_artist_ch = draw_mgmt_methylartist(index_ch.indexed_bam, input_bam, reference, outdir)
+
     // mosdepth coverage plots
     mosdepth_ch = mosdepth(threads, targets, input_bam, sample, index_ch.indexed_bam)
 
@@ -531,7 +556,7 @@ workflow {
     filter_report(filterreport, clair3_annovar_ch.clair3_output, sample, params.outdir)  
 
     // collect data and generate final report
-    make_report(makereport, cnvpytor.out, mgmt_pred.out, meth_classification.out, filter_report.out, sample, report_UKHD, mosdepth_ch.mosdepth_out)
+    make_report(makereport, cnvpytor.out, mgmt_pred.out, meth_classification.out, filter_report.out, sample, report_UKHD, mosdepth_ch.mosdepth_out, methyl_artist_ch.mgmt_plot)
 
     // check for email param, and send out reports if present
     //if (params.email != null) {
