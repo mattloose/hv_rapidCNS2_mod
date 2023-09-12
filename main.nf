@@ -476,7 +476,7 @@ workflow {
     Channel.fromPath("${projectDir}/bin/mgmt_137sites_mean_model.Rdata", checkIfExists: true)
     .set {model}
 
-    Channel.fromPath("${projectDir}/bin/mgmt_pred_v0.1.R", checkIfExists: true)
+    Channel.fromPath("${projectDir}/bin/mgmt_pred_v0.2.R", checkIfExists: true)
     .set {mgmt_pred}
 
     Channel.fromPath("${projectDir}/bin/methylation_classification_nanodx_v0.1.R", checkIfExists: true)

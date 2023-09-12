@@ -29,7 +29,7 @@ mgmt_meth <- subset(mgmt_meth, V2 %in% pred_pos)
 #write.csv(mgmt_meth,file=paste0(opt$out_dir,"/",opt$sample,"_mgmt_meth_to_check.csv"),row.names = T)
 ## na.rm=T added by GF
 mgmt_average <- mean(mgmt_meth$V11, na.rm=T)
-mgmt_average <- mean(mgmt_meth$V11)
+#mgmt_average <- mean(mgmt_meth$V11)
 mgmt <- data.frame(average=mgmt_average)
 pred <- predict(log.model,newdata = mgmt,type = "response")
 mgmt$pred <- pred[[1]]
