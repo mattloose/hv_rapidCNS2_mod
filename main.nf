@@ -22,6 +22,8 @@ log.info """\
         bam_min_coverage        : ${params.bam_min_coverage}
         min_mgmt_coverage	: ${params.minimum_mgmt_cov}
         ================================================================
+        To run with SLURM, uncomment the "process.executor" line in nextflow.config
+        ================================================================
 
         """
         .stripIndent()
@@ -77,14 +79,13 @@ process check_mgmt_coverage {
 	"""
 }
 
-
 process draw_mgmt_methylartist {
     input:
         path(indexed_bam)
         path(bam)
         path(reference)
         val(params.outdir)
-	    val ready // mgmt_coverage has run
+	val ready // mgmt_coverage has run
 
     publishDir("${params.outdir}")
     
@@ -441,6 +442,7 @@ process make_report {
         val(mgmt_cov)
     
     output:
+	val true
 
     script:
         // if mgmt coverage was above thresh (and we have the data)
@@ -546,16 +548,13 @@ workflow {
     Channel.fromPath("${projectDir}/bin/filter_report_v0.1.R", checkIfExists: true)
     .set {filterreport}
 
-    Channel.fromPath("${projectDir}/bin/make_report_v0.1.R", checkIfExists: true)
+    Channel.fromPath("${projectDir}/bin/make_report_v0.2.R", checkIfExists: true)
     .set {makereport}
 
-    Channel.fromPath("${projectDir}/bin/make_report_no_mgmt_v0.1.R", checkIfExists: true)
-    .set {makereport_no_mgmt}
-
-    Channel.fromPath("${projectDir}/bin/Rapid_CNS2_report_UKHD_v0.1.Rmd", checkIfExists: true)
+    Channel.fromPath("${projectDir}/bin/Rapid_CNS2_report_UKHD_v0.2.Rmd", checkIfExists: true)
     .set {report_UKHD}
 
-    Channel.fromPath("${projectDir}/bin/Rapid_CNS2_report_UKHD_no_mgmt_v0.1.Rmd", checkIfExists: true)
+    Channel.fromPath("${projectDir}/bin/Rapid_CNS2_report_UKHD_no_mgmt_v0.2.Rmd", checkIfExists: true)
     .set {report_UKHD_no_mgmt}
 
 ///////////////////// - run the workflow

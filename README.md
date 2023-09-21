@@ -66,7 +66,7 @@ Uncomment the `process.executor = 'slurm'` line in the nextflow.config file, the
 to submit each process into SLURM.
 
 ### Troubleshooting tips
-If the run seems to hang forever at the cnvpytor step, it may be that you have not indexed your input bam.
+If the run seems to hang forever at the cnvpytor step, it may be that you have not indexed your input bam. This is also just quite a long process.
 
 If you get the Docker Error: "docker: permission denied while trying to connect to the docker daemon socket".... on Ubuntu (based) systems, you need to add your user to the docker group. 
 Follow the instructions here: (https://www.digitalocean.com/community/questions/how-to-fix-docker-got-permission-denied-while-trying-to-connect-to-the-docker-daemon-socket)
