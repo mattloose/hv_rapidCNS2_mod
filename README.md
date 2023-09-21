@@ -62,7 +62,7 @@ These a have default values specified in the nextflow.config file, but you may o
 ```
 
 ### To run with slurm
-Uncomment the "process.executor = 'slurm'" line in the nextflow.config file, then run as normal. You do not need to submut a script with SBATCH, just run the nextflow command as normal and nextflow knows
+Uncomment the `process.executor = 'slurm'` line in the nextflow.config file, then run as normal. You do not need to submit a script with SBATCH, just run the nextflow command as normal and nextflow knows
 to submit each process into SLURM.
 
 ### Troubleshooting tips
