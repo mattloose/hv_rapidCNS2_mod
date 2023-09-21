@@ -1,9 +1,6 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-// default email val in null. specifying it will override.
-//params.email = null
-
 // set up and create an output directory
 outdir = file(params.outdir)
 outdir.mkdir()
@@ -16,12 +13,14 @@ log.info """\
 
         INPUTS
         ================================================================
-        sample        : ${params.sample}
-        patient       : ${params.patient}
-        input_bam     : ${params.bam}
-        outdir        : ${params.outdir}
-        reference     : ${params.reference}
-        threads       : ${params.threads}
+        sample                  : ${params.sample}
+        patient                 : ${params.patient}
+        input_bam               : ${params.bam}
+        outdir                  : ${params.outdir}
+        reference               : ${params.reference}
+        threads                 : ${params.threads}
+        bam_min_coverage        : ${params.bam_min_coverage}
+        min_mgmt_coverage	: ${params.minimum_mgmt_cov}
         ================================================================
 
         """
@@ -43,7 +42,7 @@ process check_bam_has_meth_data {
 process index_input_bam {
     input:
         path(input_bam)
-    
+
     output:
         path "*.bai", emit: indexed_bam
 
@@ -53,22 +52,55 @@ process index_input_bam {
         """
 }
 
+process check_mgmt_coverage {
+    input:
+        path(input_bam)
+	path(mgmt_bed)
+	val(minimum_mgmt_coverage)
+
+    publishDir("${params.outdir}")
+
+    output:
+	val true
+	path "*.txt", emit: mgmt_avg_cov_file
+        stdout emit: mgmt_avg_cov
+
+    script:
+        """
+        cov="\$(bedtools coverage -a ${mgmt_bed} -b ${input_bam} | awk '{print \$4}')"
+        echo \${cov}
+	if [ \${cov} -ge ${minimum_mgmt_coverage} ]; then
+		echo \${cov} > mgmt_avg_cov.txt
+        else 
+                echo \${cov} > mgmt_cov_below_thresh.txt
+	fi
+	"""
+}
+
+
 process draw_mgmt_methylartist {
     input:
         path(indexed_bam)
         path(bam)
         path(reference)
         val(params.outdir)
+	    val ready // mgmt_coverage has run
+
+    publishDir("${params.outdir}")
     
     output:
-        path "*.png", emit: mgmt_plot
-
-    //publishDir("${params.outdir}")
-
+        val true
+        path "*.png", emit: mgmt_plot optional true
+    
     script:
-        """
-        methylartist locus -i chr10:129466536-129467536 -b ${bam} --ref ${reference} --motif CG
-        """
+        cov_file = file("${params.outdir}/mgmt_avg_cov.txt")
+        if ( cov_file.exists() == true )    
+            """
+            methylartist locus -i chr10:129466536-129467536 -b ${bam} --ref ${reference} --motif CG
+            """
+        else
+            """
+            """
 }
 
 process mosdepth {
@@ -80,7 +112,7 @@ process mosdepth {
         path(indexed_bam)
     
     publishDir("${params.outdir}")
-
+	
     output:
         path "*.mosdepth.summary.txt", emit: mosdepth_out
 
@@ -330,14 +362,19 @@ process mgmt_pred {
         val true
 
     script:
+        cov_file = file("${params.outdir}/mgmt_avg_cov.txt")
+        if ( cov_file.exists() == true )
         """
-        Rscript ${mgmt_pred} \
-        --input ${intersect_bed} \
-        --probes ${probes} \
-        --model ${model} \
-        --out_dir ${PWD}/${params.outdir} \
-        --sample ${sample} 
+            Rscript ${mgmt_pred} \
+            --input ${intersect_bed} \
+            --probes ${probes} \
+            --model ${model} \
+            --out_dir ${PWD}/${params.outdir} \
+            --sample ${sample}
         """
+        else
+            """
+            """
 }
 
 process meth_classification {
@@ -399,39 +436,51 @@ process make_report {
         val(sample)
         path(report_UKHD)
         path(mosdepth_plot_data) // mosdepth
-        path(methylartist_plot)
+        val(methylartist_plot)
+        path(report_UKHD_no_mgmt)
+        val(mgmt_cov)
     
     output:
 
-    publishDir("${params.outdir}")
-
     script:
+        // if mgmt coverage was above thresh (and we have the data)
+        mgmt_status_file = file("${params.outdir}/${sample}_mgmt_status.csv")
+        if ( mgmt_status_file.exists() == true )
+        
         """
         Rscript ${makereport} \
-            --prefix ${sample} \
-            --mutations ${PWD}/${params.outdir}/${sample}_clair3_report.csv \
-            --cnv_plot ${PWD}/${params.outdir}/${sample}_cnvpytor_100k.global.0000.png \
-            --rf_details ${PWD}/${params.outdir}/${sample}_rf_details.tsv \
-            --votes ${PWD}/${params.outdir}/${sample}_votes.tsv \
-            --output_dir ${PWD}/${params.outdir} \
-            --patient ${sample} \
-            --coverage ${PWD}/${params.outdir}/${sample}.mosdepth.summary.txt \
-            --sample ${sample} \
-            --mgmt ${PWD}/${params.outdir}/${sample}_mgmt_status.csv \
-            --report_UKHD ${report_UKHD} \
-            --methylartist ${methylartist_plot}
+        --prefix ${sample} \
+        --mutations ${PWD}/${params.outdir}/${sample}_clair3_report.csv \
+        --cnv_plot ${PWD}/${params.outdir}/${sample}_cnvpytor_100k.global.0000.png \
+        --rf_details ${PWD}/${params.outdir}/${sample}_rf_details.tsv \
+        --votes ${PWD}/${params.outdir}/${sample}_votes.tsv \
+        --output_dir ${PWD}/${params.outdir} \
+        --patient ${sample} \
+        --coverage ${PWD}/${params.outdir}/${sample}.mosdepth.summary.txt \
+        --sample ${sample} \
+        --report_UKHD ${report_UKHD} \
+        --methylartist ${PWD}/${params.outdir}/*.locus.meth.png \
+        --mgmt ${PWD}/${params.outdir}/${sample}_mgmt_status.csv \
+        --report_UKHD_no_mgmt ${report_UKHD_no_mgmt} \
+        --promoter_mgmt_coverage ${mgmt_cov}
         """
-}
 
-// this not working at the moment https://www.nextflow.io/docs/latest/config.html
-process email_reports {
-    input:
-        val(email)
-    output:
-
-    script:
+        // else, mgmt was below thresh and there is no data
+        else
         """
-        echo "An email" | mail -s "An email" ${email}
+        Rscript ${makereport} \
+        --prefix ${sample} \
+        --mutations ${PWD}/${params.outdir}/${sample}_clair3_report.csv \
+        --cnv_plot ${PWD}/${params.outdir}/${sample}_cnvpytor_100k.global.0000.png \
+        --rf_details ${PWD}/${params.outdir}/${sample}_rf_details.tsv \
+        --votes ${PWD}/${params.outdir}/${sample}_votes.tsv \
+        --output_dir ${PWD}/${params.outdir} \
+        --patient ${sample} \
+        --coverage ${PWD}/${params.outdir}/${sample}.mosdepth.summary.txt \
+        --sample ${sample} \
+        --report_UKHD ${report_UKHD} \
+        --report_UKHD_no_mgmt ${report_UKHD_no_mgmt} \
+        --promoter_mgmt_coverage ${mgmt_cov} \
         """
 }
 
@@ -461,6 +510,9 @@ workflow {
 
     Channel.from(params.threads)
     .set {threads}
+
+    Channel.from(params.minimum_mgmt_cov)
+    .set {minimum_mgmt_cov}
 
 ///////////////////// - read required scripts and files from bin/
 
@@ -497,8 +549,14 @@ workflow {
     Channel.fromPath("${projectDir}/bin/make_report_v0.1.R", checkIfExists: true)
     .set {makereport}
 
+    Channel.fromPath("${projectDir}/bin/make_report_no_mgmt_v0.1.R", checkIfExists: true)
+    .set {makereport_no_mgmt}
+
     Channel.fromPath("${projectDir}/bin/Rapid_CNS2_report_UKHD_v0.1.Rmd", checkIfExists: true)
     .set {report_UKHD}
+
+    Channel.fromPath("${projectDir}/bin/Rapid_CNS2_report_UKHD_no_mgmt_v0.1.Rmd", checkIfExists: true)
+    .set {report_UKHD_no_mgmt}
 
 ///////////////////// - run the workflow
     // check input bam file for methylation tags
@@ -507,8 +565,12 @@ workflow {
     // index the input bam file 
     index_ch = index_input_bam(input_bam)
 
+    // check the coverage of the mgmt region in the sequence data
+    mgmt_coverage_ch = check_mgmt_coverage(input_bam, mgmt_bed, minimum_mgmt_cov)
+
     // methylartist mgmt plot
-    methyl_artist_ch = draw_mgmt_methylartist(index_ch.indexed_bam, input_bam, reference, outdir)
+    // methylartist only runs if the coverage is detected to be high enough (> minimum_mgmt_cov)
+    methyl_artist_ch = draw_mgmt_methylartist(index_ch.indexed_bam, input_bam, reference, outdir, check_mgmt_coverage.out[0])
 
     // mosdepth coverage plots
     mosdepth_ch = mosdepth(threads, targets, input_bam, sample, index_ch.indexed_bam)
@@ -547,19 +609,14 @@ workflow {
     intersect_bed_ch = bedtools_intersect2(human_variation_sv_methyl_cnv.out, mgmt_bed, 'mgmt_5mC.hg38', 'bed', sample)
 
     // run the mgmt_pred script
-    mgmt_pred(mgmt_pred, intersect_bed_ch.intersect_bed, probes, model, sample, params.outdir)
-
+    mgmt_pred_ch = mgmt_pred(mgmt_pred, intersect_bed_ch.intersect_bed, probes, model, sample, params.outdir)
+   
     // run the meth classification script
     meth_classification(meth_class, sample, params.outdir, topprobes, trainingdata, arrayfile, threads, human_variation_sv_methyl_cnv.out)
     
     // collect report data and generate report
     filter_report(filterreport, clair3_annovar_ch.clair3_output, sample, params.outdir)  
 
-    // collect data and generate final report
-    make_report(makereport, cnvpytor.out, mgmt_pred.out, meth_classification.out, filter_report.out, sample, report_UKHD, mosdepth_ch.mosdepth_out, methyl_artist_ch.mgmt_plot)
-
-    // check for email param, and send out reports if present
-    //if (params.email != null) {
-    //    email_reports(params.email)
-    //}
+    // collect data and generate final report    
+    make_report(makereport, cnvpytor.out, mgmt_pred.out, meth_classification.out, filter_report.out, sample, report_UKHD, mosdepth_ch.mosdepth_out, draw_mgmt_methylartist.out[0], report_UKHD_no_mgmt, mgmt_coverage_ch.mgmt_avg_cov)
 }

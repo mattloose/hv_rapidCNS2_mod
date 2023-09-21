@@ -47,7 +47,25 @@ nextflow run hv_rapidCNS2/main.nf \
 --patient ${PATIENT} \
 --bam ${BAM} \
 --outdir ${OUTPUT_DIR} \
---reference ${REFERENCE} \
---threads 64
+--reference ${REFERENCE}
 
 ```
+
+
+### optional extra parameters (with their default values)
+```
+--threads 16 (CPUs to use [default: 64]) 
+--bam_min_coverage (minimum coverage required to run the epi2melabs/wf-human-variation stages [ default: 5]) 
+--minimum_mgmt_cov (minimum avg coverage at the mgmt promoter. Coverage must be greater than this to run the analysis of mgmt methylation)
+
+```
+
+### Troubleshooting tips
+If the run seems to hang forever at the cnvpytor step, it may be that you have not indexed your input bam.
+
+Docker Error: "docker: permission denied while trying to connect to the docker daemon socket"
+On *buntu systems, you need to add your user to the docker group. 
+Follow the instruction here: (https://www.digitalocean.com/community/questions/how-to-fix-docker-got-permission-denied-while-trying-to-connect-to-the-docker-daemon-socket)
+
+
+

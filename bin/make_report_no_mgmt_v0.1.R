@@ -11,7 +11,7 @@ option_list = list(
   make_option(c("-p", "--prefix"), type="character", default=NULL, 
               help="prefix", metavar="character"),
   make_option(c("-m", "--mutations"), type="character", default=NULL, 
-             help="mutations table", metavar="character"),
+              help="mutations table", metavar="character"),
   make_option(c("-c", "--cnv_plot"), type="character", default=NULL,
               help="cnv plot", metavar="character"),
   make_option(c("-r", "--rf_details"), type="character", default=NULL,
@@ -26,19 +26,18 @@ option_list = list(
               help="coverage summary", metavar="character"),
   make_option(c("-s", "--sample"), type="character", default=NULL,
               help="sample", metavar="character"),
-  make_option(c("-t", "--mgmt"), type="character", default=NULL, 
-             help="mgmt prediction", metavar="character"),
+  make_option(c("-t", "--mgmt"), type="character", default=NULL,
+              help="mgmt prediction", metavar="character"),
   ## following options added by GF
   make_option(c("-a", "--methylartist"), type="character", default=NULL,
               help="methylartist mgmt plot", metavar="character"),
   make_option(c("-u", "--report_UKHD"), type="character", default=NULL,
               help="report_UKHD R markdown doc", metavar="character"),
-  make_option(c("-b", "--promoter_mgmt_coverage"), type="integer", default=NULL,
+  make_option(c("-b", "--mgmt_coverage"), type="integer", default=NULL,
               help="average coverage at mgmt promoter", metavar="character"),
-  make_option(c("-d", "--report_UKHD_no_mgmt"), type="character", default=NULL,
-              help="report_UKHD R markdown doc no mgmt version", metavar="character")
+  make_option(c("-q", "--report_UKHD_no_mgmt"), type="character", default=NULL,
+              help="report_UKHD_Rmd_no_mgmt_version", metavar="character")
 )
-
 opt_parser = OptionParser(option_list=option_list);
 opt = parse_args(opt_parser);
 prefix <- opt$prefix
@@ -48,27 +47,17 @@ cnv_plot <- opt$cnv_plot
 votes <- opt$votes
 coverage <- opt$coverage
 patient <- opt$patient
-mgmt <- opt$mgmt
+mgmt<- opt$mgmt
 sample <- opt$sample
 # add option for report_UKHD above
 report_UKHD <- opt$report_UKHD
 methylartist_plot <- opt$methylartist
-cov <- opt$promoter_mgmt_coverage
+cov <- opt$mgmt_coverage
 report_UKHD_no_mgmt <- opt$report_UKHD_no_mgmt
 
-## both these options are working now.
-# just need to get it to choose which one
-# should be able to do it based on the methylartist and mgmt args
-
 #render("/Rapid_CNS2_report_UKHD.Rmd", 
-if (!is.null(opt$methylartist) && !is.null(opt$mgmt) ) { 
-render(report_UKHD, 
+render(report_UKHD_no_mgmt, 
        output_format = "html_document", 
        output_dir=opt$output_dir,
-       output_file=paste0(prefix,"_Rapid-CNS2_report.html"))
-} else if ( is.null(opt$methylartist) && is.null(opt$mgmt) ) {
-render(report_UKHD_no_mgmt,
-       output_format = "html_document",
-       output_dir=opt$output_dir,
-       output_file=paste0(prefix,"_Rapid-CNS2_report.html"))
-}
+       output_file=paste0(prefix,"_Rapid-CNS2_report.html")
+)
