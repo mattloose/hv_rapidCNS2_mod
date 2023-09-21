@@ -52,7 +52,8 @@ nextflow run hv_rapidCNS2/main.nf \
 ```
 
 
-### optional extra parameters (with their default values)
+### Optional extra parameters (with their default values)
+These a have default values specified in the nextflow.config file, but you may override them on the CLI.
 ```
 --threads 16 (CPUs to use [default: 64]) 
 --bam_min_coverage (minimum coverage required to run the epi2melabs/wf-human-variation stages [ default: 5]) 
@@ -60,12 +61,15 @@ nextflow run hv_rapidCNS2/main.nf \
 
 ```
 
+### To run with slurm
+Uncomment the "process.executor = 'slurm'" line in the nextflow.config file, then run as normal. You do not need to submut a script with SBATCH, just run the nextflow command as normal and nextflow knows
+to submit each process into SLURM.
+
 ### Troubleshooting tips
 If the run seems to hang forever at the cnvpytor step, it may be that you have not indexed your input bam.
 
-Docker Error: "docker: permission denied while trying to connect to the docker daemon socket"
-On *buntu systems, you need to add your user to the docker group. 
-Follow the instruction here: (https://www.digitalocean.com/community/questions/how-to-fix-docker-got-permission-denied-while-trying-to-connect-to-the-docker-daemon-socket)
+If you get the Docker Error: "docker: permission denied while trying to connect to the docker daemon socket".... on Ubuntu (based) systems, you need to add your user to the docker group. 
+Follow the instructions here: (https://www.digitalocean.com/community/questions/how-to-fix-docker-got-permission-denied-while-trying-to-connect-to-the-docker-daemon-socket)
 
 
 
