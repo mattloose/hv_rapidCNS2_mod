@@ -8,7 +8,7 @@ outdir.mkdir()
 log.info """\
 
         ================================================================
-        Human-variation -> Rapid_CNS2 - Nextflow P I P E L I N E
+        Human-variation -> Rapid_CNS2 - Nextflow P I P E L I N E v0.3
         ================================================================
 
         INPUTS
