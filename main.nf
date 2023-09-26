@@ -159,7 +159,7 @@ process human_variation_sv_methyl_cnv {
             -w ${PWD}/${params.outdir}/workspace \
             --ref ${reference} \
             --sv \
-            --mod \
+            --methyl \
             --cnv \
             --bam ${input_bam} \
             --bed ${targets_bed} \
@@ -345,7 +345,7 @@ process bedtools_intersect2 {
     script:
         """
         bedtools intersect \
-        -a ${PWD}/${params.outdir}/${sample}.bed.gz \
+        -a ${PWD}/${params.outdir}/${sample}.methyl.cpg.bed.gz \
         -b ${input2} > ${output_file}.${ext}
         """
 }
@@ -399,7 +399,7 @@ process meth_classification {
         Rscript ${meth_class} \
         --sample ${sample} \
         --out_dir ${PWD}/${params.outdir} \
-        --in_file ${PWD}/${params.outdir}/${sample}.bed.gz \
+        --in_file ${PWD}/${params.outdir}/${sample}.methyl.cpg.bed.gz \
         --probes ${topprobes} \
         --training_data ${trainingdata} \
         --array_file ${arrayfile} \
@@ -530,10 +530,10 @@ workflow {
     Channel.fromPath("${projectDir}/bin/mgmt_137sites_mean_model.Rdata", checkIfExists: true)
     .set {model}
 
-    Channel.fromPath("${projectDir}/bin/mgmt_pred_v0.3.R", checkIfExists: true)
+    Channel.fromPath("${projectDir}/bin/mgmt_pred_v0.2.R", checkIfExists: true)
     .set {mgmt_pred}
 
-    Channel.fromPath("${projectDir}/bin/methylation_classification_nanodx_v0.2.R", checkIfExists: true)
+    Channel.fromPath("${projectDir}/bin/methylation_classification_nanodx_v0.1.R", checkIfExists: true)
     .set {meth_class}
 
     Channel.fromPath("${projectDir}/bin/top_probes_hm450.Rdata", checkIfExists: true)

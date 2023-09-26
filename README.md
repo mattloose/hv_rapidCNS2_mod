@@ -27,11 +27,6 @@ docker pull graefox/rapid_cns2:latest
 git clone https://github.com/graemefox/hv_rapidCNS2.git
 ```
 
-### Update to the latest epi2me-labs/wf-human-variation version
-```
-nextflow pull epi2me-labs/wf-human-variation
-```
-
 
 ### Example command:
 ```
