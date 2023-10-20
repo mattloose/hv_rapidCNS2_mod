@@ -22,9 +22,10 @@ nextflow
 docker pull graefox/rapid_cns2:latest
 ```
 
-### Clone workflow repository
+### pull latest version of workflow, and required dependencies
 ```
-git clone https://github.com/graemefox/hv_rapidCNS2.git
+nextflow pull graemefox/hv_rapidCNS2
+nextflow pull epi2me-labs/wf-human-variation
 ```
 
 
@@ -40,7 +41,7 @@ REFERENCE=my_reference.fa.gz
 
 ## run the pipeline
 
-nextflow run hv_rapidCNS2/main.nf \
+nextflow run graemefox/hv_rapidCNS2 \
 -with-docker graefox/rapid_cns2:latest \
 -with-report ${OUTPUT_DIR}/${SAMPLE}_nextflow_report.html \
 --sample ${SAMPLE} \
@@ -50,7 +51,6 @@ nextflow run hv_rapidCNS2/main.nf \
 --reference ${REFERENCE}
 
 ```
-
 
 ### Optional extra parameters (with their default values)
 These a have default values specified in the nextflow.config file, but you may override them on the CLI.
