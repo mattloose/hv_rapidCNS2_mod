@@ -2,7 +2,7 @@
 
 It takes an aligned bam of ONT data along with the .bai index and runs epi2me-labs wf-human-variation to generate SNP, SV, and CNV variants and also aggregate methylation data (the --snp, --sv, --cnv, and --methyl options).
 
-Outputs from wf-human-variation are then analysed using Rapid-CNS2 to generate the final report.
+Outputs from wf-human-variation are then analysed using Rapid-CNS2 to generate the final report. They are also optionally analysed using the Sturgeon classifier (see optional extra parameters below).
 
 Input BAM file **MUST** contain methylation data (MM:Z tags). The workflow should ERROR if MM:Z tags are not present.
 The .bai index must be in the same location as the input bam.
@@ -58,11 +58,12 @@ These a have default values specified in the nextflow.config file, but you may o
 --threads 16 (CPUs to use [default: 64]) 
 --bam_min_coverage (minimum coverage required to run the epi2melabs/wf-human-variation stages [ default: 5]) 
 --minimum_mgmt_cov (minimum avg coverage at the mgmt promoter. Coverage must be greater than this to run the analysis of mgmt methylation)
+--sturgeon (the nextflow will ALSO run the sturgeon (https://github.com/marcpaga/sturgeon) classifier if the --sturgeon flag is passed. Defualt behaviour is to run rapid_CNS2 only.)
 
 ```
 
 ### To run with slurm
-Uncomment the `process.executor = 'slurm'` line in the nextflow.config file, then run as normal. You do not need to submit a script with SBATCH, just run the nextflow command as normal and nextflow knows
+Add `-process.executor='slurm'` to your nextflow command, then run as normal. You do not need to submit a script with SBATCH, just run the nextflow command as normal and nextflow knows
 to submit each process into SLURM.
 
 ### Troubleshooting tips

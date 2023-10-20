@@ -34,7 +34,8 @@ dir.create(file.path(opt$out_dir), showWarnings = FALSE)
 meth <- read.delim(opt$in_file,header=FALSE)
 
 #Keep relevant columns
-meth_filter <- meth[,c(1:3,6,10:11)]
+#meth_filter <- meth[,c(1:3,6,10:11)]
+meth_filter <- as.data.frame(cbind(meth[,c(1:3,6)], t(as.data.frame(strsplit(meth$V10, " ")))[,1:2]))
 
 rm(meth)
 
@@ -44,6 +45,11 @@ colnames(meth_filter) <- c("chr","start","end","strand","cov","methylation_perce
 #Remove X and Y chromosomes
 meth_filter <- subset(meth_filter, !(chr %in% c("chrX","chrY")))
 meth_filter <- meth_filter[complete.cases(meth_filter), ]
+
+## convert str to numeric
+meth_filter$cov <- as.numeric(meth_filter$cov)
+meth_filter$methylation_percent <- as.numeric(meth_filter$methylation_percent)
+
 #Convert to decimal for comparison to array beta values
 meth_filter$methylation <- meth_filter$methylation_percent/100
 print("GRanges")

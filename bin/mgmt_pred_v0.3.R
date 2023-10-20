@@ -15,7 +15,9 @@ option_list = list(
   make_option(c("-o", "--out_dir"), type="character", default=NULL, 
               help="output directory", metavar="character"),
   make_option(c("-s", "--sample"), type="character", default=NULL, 
-              help="sample", metavar="character")
+              help="sample", metavar="character"),
+  make_option(c("-t", "--threads"), type="character", default=NULL,
+              help="threads", metavar="character")
 )
 
 opt_parser = OptionParser(option_list=option_list);
@@ -28,10 +30,13 @@ mgmt_meth <- subset(mgmt_meth, V2 %in% pred_pos)
 ## temp file added to check effect of na.rm added below
 #write.csv(mgmt_meth,file=paste0(opt$out_dir,"/",opt$sample,"_mgmt_meth_to_check.csv"),row.names = T)
 ## na.rm=T added by GF
-mgmt_average <- mean(mgmt_meth$V11, na.rm=T)
+#mgmt_average <- mean(mgmt_meth$V11, na.rm=T)
+mgmt_average <- mean(t(as.numeric(as.data.frame(strsplit(mgmt_meth$V10, ' ', fixed=TRUE))[2,])), na.rm=T)
 #mgmt_average <- mean(mgmt_meth$V11)
 mgmt <- data.frame(average=mgmt_average)
-pred <- predict(log.model,newdata = mgmt,type = "response")
+#pred <- predict(log.model,newdata = mgmt,type = "response")
+## GF added a cores argument
+pred <- predict(log.model,newdata = mgmt,type = "response", cores=opt$threads)
 mgmt$pred <- pred[[1]]
 if (pred[[1]] <0.5){mgmt$status <- "Unmethylated"} else {mgmt$status <- "Methylated"}
 write.csv(mgmt,file=paste0(opt$out_dir,"/",opt$sample,"_mgmt_status.csv"),row.names = F)
