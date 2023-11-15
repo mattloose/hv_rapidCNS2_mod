@@ -5,8 +5,9 @@ nextflow.enable.dsl=2
 outdir = file(params.outdir)
 outdir.mkdir()
 
-// default behaviour is to NOT run sturgeon classifier
+// default behaviour is to NOT run sturgeon classifier or NanoPlot
 params.sturgeon = null
+params.nanoplot = null
 
 log.info """\
 
@@ -21,25 +22,29 @@ log.info """\
         input_bam               : ${params.bam}
         outdir                  : ${params.outdir}
         reference               : ${params.reference}
+        annotations             : ${params.annotations}
         threads                 : ${params.threads}
         bam_min_coverage        : ${params.bam_min_coverage}
         min_mgmt_coverage	: ${params.minimum_mgmt_cov}
         sturgeon                : ${params.sturgeon}
+        nanoplot                : ${params.nanoplot}
 
         ================================================================
         To run with SLURM, add -process.executor='slurm' to your nextflow command.
 
         To ALSO run the sturgeon classifier, add the --sturgeon flag. (Default behaviour is to not run sturgeon)
+        To generate a NanoPlot report, add the --nanoplot flag. (Default behaviour is to not generate QC report)
         ================================================================   
 
         ================================================================
-        Latest Changes in v.0.5:
-        - Added nanoplot process to generate a quality control report
-        - Average mgmt coverage is now calculated by mosdepth (quicker)
-        - Updated to work with epi2me-labs/wf-human-variation >= v.1.8.1
-        - bedmethyl file is filtered to 5mC only ('m' rows). Due to change from modbam2bed -> modkit in wf-human-variation
-        - Added retry strategies where an input file is sometimes temporarily not available (methylartist the main culprit)
-        - Included an additional classification method: sturgeon (enable w/ --sturgeon), (SLOW)
+        Latest Changes in v.0.7:
+        - NanoPlot report is now optional (add --nanoplot)
+        - Sturgeon outputs (when enabled with  --sturgeon) now included in output report
+        - igv-reports report now generated for each SNP in the Clair3 report
+        - Previous version of mutations removed from report and replaced with embedded igv-reports report
+        - Report Rmd tidied up handling of MGMT coverage too low and sturgeon switches
+        - DOCKER - small modifications to methylartist script to handle data where the first read is not methylated (all flagged with #GF)
+        - annotations now a REQUIRED parameter: an annotation set is required for the igv-reports output. Inc. with --annotations
         ================================================================
 
         """
@@ -59,7 +64,38 @@ process check_bam_has_meth_data {
         """
 }
 
+process modkit_adjust_mods {
+    input:
+        path(input_bam)
+        val(sample)
+        val(threads)
+
+    publishDir("${params.outdir}")
+
+    output:
+        path "*_modkit_merge.bam", emit: modkit_merged_bam
+
+    script:
+        """
+        /modkit adjust-mods --convert h m ${input_bam} ${sample}_modkit_merge.bam --threads ${threads}
+        """
+}
+
 process index_input_bam {
+    input:
+        path(input_bam)
+        val(threads)
+
+    output:
+        path "*.bai", emit: indexed_bam
+
+    script:
+        """
+        samtools index -@${threads} ${input_bam}
+        """
+}
+
+process index_merged_bam {
     input:
         path(input_bam)
         val(threads)
@@ -83,11 +119,11 @@ process nanoplot {
     publishDir("${params.outdir}")
 
     output:
-        path "NanoPlot-report.html", emit: nanoplot
-    
+        path "*NanoPlot-report.html", emit: nanoplot
+
     script:
         """
-        NanoPlot -t ${threads} --bam ${input_bam}
+        NanoPlot -t ${threads} --bam ${input_bam} -p ${sample}
         """
 }
 
@@ -123,8 +159,6 @@ process check_mgmt_coverage {
 
 
 process draw_mgmt_methylartist {
-
-    //errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return 'retry' }
     maxRetries 5
     errorStrategy { (task.attempt <= maxRetries) ? 'retry' : 'ignore' }
 
@@ -134,7 +168,6 @@ process draw_mgmt_methylartist {
         path(reference)
         val(params.outdir)
 	val ready // mgmt_coverage has run
-
 
     publishDir("${params.outdir}")
     
@@ -220,27 +253,7 @@ process human_variation_sv_methyl_cnv {
             --bam_min_coverage ${bam_min_coverage} \
             --out_dir ${PWD}/${params.outdir} \
             --threads ${threads}
-
         """ 
-}
-
-process filter_to_5mC_only {
-    input:
-        val(ready)
-        val(sample)
-        val(outdir)
-
-    publishDir("${params.outdir}")
-
-    output:
-        val true
-
-    script:
-    """
-    zcat ${PWD}/${params.outdir}/${sample}.bed.gz \
-    | awk -F ' ' '\$4 == "m" {print;}' \
-    | pigz -1 > ${PWD}/${params.outdir}/${sample}.bed.5mC.gz    
-    """
 }
 
 process subset_bam_by_bed {
@@ -249,6 +262,8 @@ process subset_bam_by_bed {
         path(input_bed)
         val(sample)
         val(threads)
+
+    publishDir("${params.outdir}")
 
     output:
         path "*subset.bam", emit: subsetted_bam
@@ -270,7 +285,7 @@ process subset_bam_by_bed {
         val(sample)
         val(outdir)
         val(bam_min_coverage)
-        val ready
+        val(ready)
         val(threads)
 
     output:
@@ -293,7 +308,38 @@ process subset_bam_by_bed {
         """
  }
 
- process cnvpytor{
+ process igv_reports {
+    input:
+        val(ready)  // filter-report ready
+        val(sample)
+        path(reference)
+        path(input_bam)
+        path(indexed_bam)
+        path(annotations)
+
+    publishDir("${params.outdir}")
+
+    output:
+        val true
+ 
+    script:
+        """
+        sed -e 's/,/\t/g' -e 's/\"//g' \
+        ${PWD}/${params.outdir}/${sample}_clair3_report.csv > ${PWD}/${params.outdir}/${sample}_clair3_report.fmt.csv 
+        create_report ${PWD}/${params.outdir}/${sample}_clair3_report.fmt.csv \
+        --fasta ${reference} \
+        --sequence 1 \
+        --begin 2 \
+        --end 3 \
+        --flanking 1000 \
+        --info-columns Chr Start End Func Gene ExonicFunc AAChange cytoBand 1000g_EUR COSMIC \
+        --output ${PWD}/${params.outdir}/${sample}_igv-report.html \
+        --standalone \
+        --tracks ${input_bam} ${annotations}
+        """
+}
+
+ process cnvpytor {
     input:
         val(sample)
         path(input_bam)
@@ -429,7 +475,7 @@ process bedtools_intersect2 {
     script:
         """
         bedtools intersect \
-        -a ${PWD}/${params.outdir}/${sample}.bed.5mC.gz \
+        -a ${PWD}/${params.outdir}/${sample}.bed.gz \
         -b ${input2} > ${output_file}.${ext}
         """
 }
@@ -485,7 +531,7 @@ process meth_classification {
         Rscript ${meth_class} \
         --sample ${sample} \
         --out_dir ${PWD}/${params.outdir} \
-        --in_file ${PWD}/${params.outdir}/${sample}.bed.5mC.gz \
+        --in_file ${PWD}/${params.outdir}/${sample}.bed.gz \
         --probes ${topprobes} \
         --training_data ${trainingdata} \
         --array_file ${arrayfile} \
@@ -494,6 +540,9 @@ process meth_classification {
 }
 
 process filter_report {
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return 'retry' }
+    maxRetries 5
+
     input:
         path(filterreport)
         path(clair3_multianno)
@@ -524,8 +573,9 @@ process make_report {
         val(sample)
         path(report_UKHD)
         path(mosdepth_plot_data) // mosdepth
-        path(report_UKHD_no_mgmt)
         val(mgmt_cov)
+        val(sturgeon) // sturgeon has run
+        val(igv_reports) //igv_reports has run
     
     output:
 	val true
@@ -547,9 +597,11 @@ process make_report {
             --coverage ${PWD}/${params.outdir}/${sample}.mosdepth.summary.txt \
             --sample ${sample} \
             --report_UKHD ${report_UKHD} \
-            --methylartist ${PWD}/${params.outdir}/*.locus.meth.png \
+            --methylartist ${PWD}/${params.outdir}/*.chr10_129466536_129467536.m.ms1.smw20.locus.meth.png \
             --mgmt ${PWD}/${params.outdir}/${sample}_mgmt_status.csv \
-            --report_UKHD_no_mgmt ${report_UKHD_no_mgmt} \
+            --sturgeon_csv ${PWD}/${params.outdir}/${sample}_sturgeon_scores.csv \
+            --sturgeon_pdf ${PWD}/${params.outdir}/${sample}_sturgeon_classification.pdf \
+            --igv_report ${PWD}/${params.outdir}/${sample}_igv-report.html \
             --promoter_mgmt_coverage ${mgmt_cov}
         """
 
@@ -567,25 +619,13 @@ process make_report {
             --coverage ${PWD}/${params.outdir}/${sample}.mosdepth.summary.txt \
             --sample ${sample} \
             --report_UKHD ${report_UKHD} \
-            --report_UKHD_no_mgmt ${report_UKHD_no_mgmt} \
-            --promoter_mgmt_coverage ${mgmt_cov} \
-        """
+            --sturgeon_csv ${PWD}/${params.outdir}/${sample}_sturgeon_scores.csv \
+            --sturgeon_pdf ${PWD}/${params.outdir}/${sample}_sturgeon_classification.pdf \
+            --igv_report ${PWD}/${params.outdir}/${sample}_igv-report.html \
+            --promoter_mgmt_coverage ${mgmt_cov}
+            """
 }
 
-process STURGEON_modkit_adjust_mods {
-    input:
-        path(input_bam)
-        val(sample)
-        val(threads)
-
-    output:
-        path "*_modkit_merge.bam", emit: modkit_merged_bam
-
-    script:
-        """
-        /modkit adjust-mods --convert h m ${input_bam} ${sample}}_modkit_merge.bam --threads ${threads}
-        """
-}
 
 process STURGEON_modkit_extract {
     input:
@@ -615,7 +655,7 @@ process STURGEON_inputtobed {
 
     script:
         """
-        source /sturgeon/venv/bin/activate
+        source /sturgeon-0.4.2/venv/bin/activate
         sturgeon inputtobed \
         --reference-genome hg38 \
         -i ${modkit_out} \
@@ -628,17 +668,34 @@ process STURGEON_inputtobed {
 process STURGEON_predict {
     input:
         path(input_bed) // sturgeon inputtobed output
-        
+
+    output:
+        val(true)
+
+    script:
+        """
+        source /sturgeon-0.4.2/venv/bin/activate
+        sturgeon predict \
+        -i  ${input_bed} \
+        -o ${PWD}/${params.outdir} \
+        --model-files /sturgeon-0.4.2/sturgeon/include/models/CAPPER_MODEL.zip \
+        --plot-results        
+        """
+}
+
+process STURGEON_rename {
+    input:
+        val(sturgeon) //  sturgeon predict has run
+        val(sample)
+
+    publishDir("${params.outdir}")
+
     output:
 
     script:
         """
-        source /sturgeon/venv/bin/activate
-        sturgeon predict \
-        -i  ${input_bed} \
-        -o ${PWD}/${params.outdir} \
-        --model-files /sturgeon/sturgeon/include/models/CAPPER_MODEL.zip \
-        --plot-results        
+        mv ${PWD}/${params.outdir}/merged_probes_methyl_calls_CAPPER_MODEL.pdf ${PWD}/${params.outdir}/${sample}_sturgeon_classification.pdf
+        mv ${PWD}/${params.outdir}/merged_probes_methyl_calls_CAPPER_MODEL.csv ${PWD}/${params.outdir}/${sample}_sturgeon_scores.csv
         """
 }
 
@@ -672,6 +729,10 @@ workflow {
     Channel.from(params.minimum_mgmt_cov)
     .set {minimum_mgmt_cov}
 
+    Channel.fromPath(params.annotations, checkIfExists: true)
+    .set {annotations}
+
+
 ///////////////////// - read required scripts and files from bin/
 
     Channel.fromPath("${projectDir}/bin/NPHD_panel_hg38_clean.bed", checkIfExists: true)
@@ -704,43 +765,47 @@ workflow {
     Channel.fromPath("${projectDir}/bin/filter_report_v0.1.R", checkIfExists: true)
     .set {filterreport}
 
-    Channel.fromPath("${projectDir}/bin/make_report_v0.2.R", checkIfExists: true)
+    Channel.fromPath("${projectDir}/bin/make_report_v0.3.R", checkIfExists: true)
     .set {makereport}
 
-    Channel.fromPath("${projectDir}/bin/Rapid_CNS2_report_UKHD_v0.2.Rmd", checkIfExists: true)
+    Channel.fromPath("${projectDir}/bin/Rapid_CNS2_report_UKHD_v0.4.Rmd", checkIfExists: true)
     .set {report_UKHD}
-
-    Channel.fromPath("${projectDir}/bin/Rapid_CNS2_report_UKHD_no_mgmt_v0.2.Rmd", checkIfExists: true)
-    .set {report_UKHD_no_mgmt}
 
 ///////////////////// - run the workflow
     // check input bam file for methylation tags
     check_ch = check_bam_has_meth_data(input_bam, threads)
 
-    // index the input bam file 
+    // use modkit to merge 'm' and 'h' mods into a single score
+    modkit_adjust_ch = modkit_adjust_mods(input_bam, sample, threads)
+
+    // index the input bam
     index_ch = index_input_bam(input_bam, threads)
+
+    // index the merged bam file 
+    merged_index_ch = index_merged_bam(modkit_adjust_ch.modkit_merged_bam, threads)
+
+    if ( params.nanoplot != null) {
 
     // generate NanoPlot QC Report
     nanoplot(input_bam, threads, sample, index_ch.indexed_bam)
+
+    }
 
     // check the coverage of the mgmt region in the sequence data
     mgmt_coverage_ch = check_mgmt_coverage(input_bam, mgmt_bed, minimum_mgmt_cov, index_ch.indexed_bam, threads)
 
     // methylartist mgmt plot
     // methylartist only runs if the coverage is detected to be high enough (> minimum_mgmt_cov)
-    methyl_artist_ch = draw_mgmt_methylartist(index_ch.indexed_bam, input_bam, reference, outdir, check_mgmt_coverage.out[0])
+    methyl_artist_ch = draw_mgmt_methylartist(merged_index_ch.indexed_bam, modkit_adjust_ch.modkit_merged_bam, reference, outdir, check_mgmt_coverage.out[0])
 
     // mosdepth coverage plots
     mosdepth_ch = mosdepth(threads, targets, input_bam, sample, index_ch.indexed_bam)
 
     // call and run the epi2me-labs/wf-human-variation
-    human_variation_sv_methyl_cnv(input_bam, targets, reference, sample, outdir, 1, index_ch.indexed_bam, threads)
-
-    // filter the methylBED (*.bed.gz) file produced by human-variation to just the 5mC rows ('m' in the file)
-    filter_to_5mC_only(human_variation_sv_methyl_cnv.out, sample, outdir)
+    human_variation_sv_methyl_cnv(modkit_adjust_ch.modkit_merged_bam, targets, reference, sample, outdir, 1, merged_index_ch.indexed_bam, threads)
 
     // subset the input bam file by the bed file - to speed up the SNP portion of human-variation
-    subsetted_bam_ch = subset_bam_by_bed(input_bam, targets, sample, threads)
+    subsetted_bam_ch = subset_bam_by_bed(modkit_adjust_ch.modkit_merged_bam, targets, sample, threads)
 
     // index the subsetted bam generated above
     index_subsetted_bam(subsetted_bam_ch.subsetted_bam, threads)
@@ -767,26 +832,24 @@ workflow {
     clair3_annovar_ch = table_annovar(converted_annovar_ch.annovar_input, 'hg38', sample, '_clair3_panel', threads)
 
     // run bedtools intersect
-    intersect_bed_ch = bedtools_intersect2(filter_to_5mC_only.out, mgmt_bed, 'mgmt_5mC.hg38', 'bed', sample)
+    intersect_bed_ch = bedtools_intersect2(human_variation_sv_methyl_cnv.out, mgmt_bed, 'mgmt_5mC.hg38', 'bed', sample)
 
     // run the mgmt_pred script
     mgmt_pred_ch = mgmt_pred(mgmt_pred, intersect_bed_ch.intersect_bed, probes, model, sample, params.outdir, threads)
    
     // run the meth classification script
-    meth_classification(meth_class, sample, params.outdir, topprobes, trainingdata, arrayfile, threads, filter_to_5mC_only.out)
+    meth_classification(meth_class, sample, params.outdir, topprobes, trainingdata, arrayfile, threads, human_variation_sv_methyl_cnv.out)
     
     // collect report data and generate report
     filter_report(filterreport, clair3_annovar_ch.clair3_output, sample, params.outdir)  
 
-    // collect data and generate final report    
-    make_report(makereport, cnvpytor.out, mgmt_pred.out, meth_classification.out, filter_report.out, sample, report_UKHD, mosdepth_ch.mosdepth_out, report_UKHD_no_mgmt, mgmt_coverage_ch.mgmt_avg_cov)
+    // produce igv_report for each SNP in the clair3 report
+    igv_reports(filter_report.out, sample, reference, input_bam, index_ch.indexed_bam, annotations)
 
     if ( params.sturgeon != null) {
+
     // sturgeon section
     ///////////////////////////////////
-
-    // use modkit to merge 'm' and 'h' mods into a single score
-    modkit_adjust_ch = STURGEON_modkit_adjust_mods(input_bam, sample, threads)
 
     // modkit extract values
     modkit_extract_ch = STURGEON_modkit_extract(modkit_adjust_ch.modkit_merged_bam, sample, threads)
@@ -796,5 +859,16 @@ workflow {
 
     // sturgeon predict
     STURGEON_predict(sturgeon_inputtobed_ch.sturgeon_bed_convert)
+
+    // sturgeon rename
+    STURGEON_rename(STURGEON_predict.out, sample)
+    
+    // generate report inc. sturgeon
+    make_report(makereport, cnvpytor.out, mgmt_pred.out, meth_classification.out, filter_report.out, sample, report_UKHD, mosdepth_ch.mosdepth_out, mgmt_coverage_ch.mgmt_avg_cov, STURGEON_predict.out, igv_reports.out)
+
+    } else {
+
+    // collect data and generate final report - no sturgeon
+    make_report(makereport, cnvpytor.out, mgmt_pred.out, meth_classification.out, filter_report.out, sample, report_UKHD, mosdepth_ch.mosdepth_out, mgmt_coverage_ch.mgmt_avg_cov, "NULL", igv_reports.out)
     }
 }

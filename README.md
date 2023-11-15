@@ -11,6 +11,15 @@ The provided reference should be the same reference used to align reads in the i
 
 At present, it relies upon the *outdir* being within the current working directory. Setting a full path to some other location will cause errors.
 
+### Latest updates in v0.7:
+- NanoPlot report is now optional (add --nanoplot)
+- Sturgeon outputs (when enabled with  --sturgeon) now included in output report
+- igv-reports report now generated for each SNP in the Clair3 report
+- Previous version of mutations removed from report and replaced with embedded igv-reports report
+- Report Rmd tidied up handling of MGMT coverage too low and sturgeon switches
+- DOCKER - small modifications to methylartist script to handle data where the first read is not methylated (all flagged with #GF)
+- annotations now a REQUIRED parameter: an annotation set is required for the igv-reports output. Inc. with --annotations
+
 ### Requirements:
 ```
 docker
@@ -38,6 +47,7 @@ PATIENT=JohnDoe
 OUTPUT_DIR=${SAMPLE}_output
 BAM=my_data.bam
 REFERENCE=my_reference.fa.gz
+ANNOTATIONS=my_annotation_set.gtf
 
 ## run the pipeline
 
@@ -48,7 +58,8 @@ nextflow run graemefox/hv_rapidCNS2 \
 --patient ${PATIENT} \
 --bam ${BAM} \
 --outdir ${OUTPUT_DIR} \
---reference ${REFERENCE}
+--reference ${REFERENCE} \
+--annotations ${ANNOTATIONS}
 
 ```
 
@@ -71,6 +82,3 @@ If the run seems to hang forever at the cnvpytor step, it may be that you have n
 
 If you get the Docker Error: "docker: permission denied while trying to connect to the docker daemon socket".... on Ubuntu (based) systems, you need to add your user to the docker group. 
 Follow the instructions here: (https://www.digitalocean.com/community/questions/how-to-fix-docker-got-permission-denied-while-trying-to-connect-to-the-docker-daemon-socket)
-
-
-

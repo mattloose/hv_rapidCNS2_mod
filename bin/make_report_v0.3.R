@@ -35,8 +35,12 @@ option_list = list(
               help="report_UKHD R markdown doc", metavar="character"),
   make_option(c("-b", "--promoter_mgmt_coverage"), type="integer", default=NULL,
               help="average coverage at mgmt promoter", metavar="character"),
-  make_option(c("-d", "--report_UKHD_no_mgmt"), type="character", default=NULL,
-              help="report_UKHD R markdown doc no mgmt version", metavar="character")
+  make_option(c("-d", "--sturgeon_pdf"), type="character", default=NULL,
+              help="sturgeon output pdf", metavar="character"),
+  make_option(c("-f", "--sturgeon_csv"), type="character", default=NULL,
+              help="sturgeon output csv", metavar="character"),
+  make_option(c("-g", "--igv_report"), type="character", default=NULL,
+              help="IGV-report html output", metavar="character")
 )
 
 opt_parser = OptionParser(option_list=option_list);
@@ -54,19 +58,19 @@ sample <- opt$sample
 report_UKHD <- opt$report_UKHD
 methylartist_plot <- opt$methylartist
 cov <- opt$promoter_mgmt_coverage
-report_UKHD_no_mgmt <- opt$report_UKHD_no_mgmt
 
-## if there is mgmt coverage data
-if (!is.null(opt$methylartist) && !is.null(opt$mgmt) ) { 
+## check for existience of sturgeon files (it might not have run)
+if (file.exists(opt$sturgeon_pdf)){
+	sturgeon_pdf <- opt$sturgeon_pdf
+	sturgeon_csv <- opt$sturgeon_csv
+} else {
+	sturgeon_pdf <- "NULL"
+	sturgeon_csv <- "NULL"
+}
+
+igv_report <- opt$igv_report
+
 render(report_UKHD, 
        output_format = "html_document", 
        output_dir=opt$output_dir,
        output_file=paste0(prefix,"_Rapid-CNS2_report.html"))
-
-## if mgmt coverage data is missing
-} else if ( is.null(opt$methylartist) && is.null(opt$mgmt) ) {
-render(report_UKHD_no_mgmt,
-       output_format = "html_document",
-       output_dir=opt$output_dir,
-       output_file=paste0(prefix,"_Rapid-CNS2_report.html"))
-}
