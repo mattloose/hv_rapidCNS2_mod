@@ -363,9 +363,8 @@ process subset_bam_by_bed {
 }
 
 process vcftools {
-
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return 'retry' }
     maxRetries 5
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return 'retry' }
 
     input:
         val(ready) // human-variation sv, cnv, methyl
