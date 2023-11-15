@@ -12,7 +12,7 @@ params.nanoplot = null
 log.info """\
 
         ================================================================
-        Human-variation -> Rapid_CNS2 - Nextflow P I P E L I N E v.0.5
+        Human-variation -> Rapid_CNS2 - Nextflow P I P E L I N E v.0.7
         ================================================================
 
         INPUTS
