@@ -11,14 +11,14 @@ The provided reference should be the same reference used to align reads in the i
 
 At present, it relies upon the *outdir* being within the current working directory. Setting a full path to some other location will cause errors.
 
-### Latest updates in v0.7:
-- NanoPlot report is now optional (add --nanoplot)
-- Sturgeon outputs (when enabled with  --sturgeon) now included in output report
-- igv-reports report now generated for each SNP in the Clair3 report
-- Previous version of mutations removed from report and replaced with embedded igv-reports report
-- Report Rmd tidied up handling of MGMT coverage too low and sturgeon switches
-- DOCKER - small modifications to methylartist script to handle data where the first read is not methylated (all flagged with #GF)
-- annotations now a REQUIRED parameter: an annotation set is required for the igv-reports output. Inc. with --annotations
+### Latest updates in v0.8.1:
+- wf-human-variation "--mod" module uses the BAM file with the merged mods
+- wf-human-variation "--snp" uses the raw BAM subsetted to just the target regions
+- wf-human-variation "--sv" use the subsetted BAM, which has all associated supplementary alignments retained
+- wf-human-variation "--cnv" uses the raw input BAM
+- two versions of the output report are created; a lite v with a simple mutations table and a full v with interactive igvreport
+- hv_rapidCNS2 workflow version number now included in the final report
+- sequencer information derived from input BAM and included in report (can be specified with --seq)
 
 ### Requirements:
 ```

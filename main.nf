@@ -5,14 +5,22 @@ nextflow.enable.dsl=2
 outdir = file(params.outdir)
 outdir.mkdir()
 
-// default behaviour is to NOT run sturgeon classifier or NanoPlot
-params.sturgeon = null
-params.nanoplot = null
+nextflow_version="v.0.8.1"
+
+// default behaviour is to NOT:
+// run sturgeon classifier 
+// run NanoPlot
+// embed the igv-report into the final report
+
+// default the various optional parameters to false
+params.sturgeon = false
+params.nanoplot = false
+params.seq = false
 
 log.info """\
 
         ================================================================
-        Human-variation -> Rapid_CNS2 - Nextflow P I P E L I N E v.0.7
+        Human-variation -> Rapid_CNS2 - Nextflow P I P E L I N E ${nextflow_version}
         ================================================================
 
         INPUTS
@@ -25,7 +33,7 @@ log.info """\
         annotations             : ${params.annotations}
         threads                 : ${params.threads}
         bam_min_coverage        : ${params.bam_min_coverage}
-        min_mgmt_coverage	: ${params.minimum_mgmt_cov}
+        min_mgmt_coverage       : ${params.minimum_mgmt_cov}
         sturgeon                : ${params.sturgeon}
         nanoplot                : ${params.nanoplot}
 
@@ -34,17 +42,17 @@ log.info """\
 
         To ALSO run the sturgeon classifier, add the --sturgeon flag. (Default behaviour is to not run sturgeon)
         To generate a NanoPlot report, add the --nanoplot flag. (Default behaviour is to not generate QC report)
-        ================================================================   
+        ================================================================
 
         ================================================================
-        Latest Changes in v.0.7:
-        - NanoPlot report is now optional (add --nanoplot)
-        - Sturgeon outputs (when enabled with  --sturgeon) now included in output report
-        - igv-reports report now generated for each SNP in the Clair3 report
-        - Previous version of mutations removed from report and replaced with embedded igv-reports report
-        - Report Rmd tidied up handling of MGMT coverage too low and sturgeon switches
-        - DOCKER - small modifications to methylartist script to handle data where the first read is not methylated (all flagged with #GF)
-        - annotations now a REQUIRED parameter: an annotation set is required for the igv-reports output. Inc. with --annotations
+        Latest Changes in v.0.8.1:
+        - wf-human-variation "--mod" module uses the BAM file with the merged mods
+        - wf-human-variation "--snp" uses the raw BAM subsetted to just the target regions
+        - wf-human-variation "--sv" use the subsetted BAM, which has all associated supplementary alignments retained
+        - wf-human-variation "--cnv" uses the raw input BAM
+        - two versions of the output report are created; a lite v with a simple mutations table and a full v with interactive igvreport
+        - hv_rapidCNS2 workflow version number now included in the final report
+        - sequencer information derived from input BAM and included in report (can be specified with --seq)
         ================================================================
 
         """
@@ -60,7 +68,11 @@ process check_bam_has_meth_data {
 
     script:
         """
-        samtools view -@${threads} ${input_bam} | grep -m 1 MM:Z
+        samtools \
+        view \
+        -@${threads} \
+        ${input_bam} \
+        | grep -m 1 MM:Z
         """
 }
 
@@ -77,7 +89,12 @@ process modkit_adjust_mods {
 
     script:
         """
-        /modkit adjust-mods --convert h m ${input_bam} ${sample}_modkit_merge.bam --threads ${threads}
+        /modkit \
+        adjust-mods \
+        --convert h m \
+        ${input_bam} \
+        ${sample}_modkit_merge.bam \
+        --threads ${threads}
         """
 }
 
@@ -91,7 +108,10 @@ process index_input_bam {
 
     script:
         """
-        samtools index -@${threads} ${input_bam}
+        samtools \
+        index \
+        -@${threads} \
+        ${input_bam}
         """
 }
 
@@ -100,12 +120,17 @@ process index_merged_bam {
         path(input_bam)
         val(threads)
 
+    publishDir("${params.outdir}")
+
     output:
         path "*.bai", emit: indexed_bam
 
     script:
         """
-        samtools index -@${threads} ${input_bam}
+        samtools \
+        index \
+        -@${threads} \
+        ${input_bam}
         """
 }
 
@@ -123,7 +148,10 @@ process nanoplot {
 
     script:
         """
-        NanoPlot -t ${threads} --bam ${input_bam} -p ${sample}
+        NanoPlot \
+        -t ${threads} \
+        --bam ${input_bam} \
+        -p ${sample}
         """
 }
 
@@ -145,8 +173,14 @@ process check_mgmt_coverage {
 
     script:
         """
-        /mosdepth -t ${threads} -n --by ${mgmt_bed} mgmt_cov ${input_bam}
+        /mosdepth \
+        -t ${threads} \
+        -n \
+        --by ${mgmt_bed} \
+        mgmt_cov ${input_bam}
+        
         cov="\$(grep "^chr10_region" mgmt_cov.mosdepth.summary.txt | awk '{ print \$4 }')"
+        
         echo \${cov}
         if awk 'BEGIN{exit ARGV[1]>ARGV[2]}' "\$cov" ${minimum_mgmt_coverage}
         then
@@ -156,7 +190,6 @@ process check_mgmt_coverage {
         fi
 	"""
 }
-
 
 process draw_mgmt_methylartist {
     maxRetries 5
@@ -179,7 +212,13 @@ process draw_mgmt_methylartist {
         cov_file = file("${params.outdir}/mgmt_avg_cov.txt")
         if ( cov_file.exists() == true )    
             """
-            python3 /methylartist/methylartist locus -i chr10:129466536-129467536 -b ${bam} --ref ${reference} --motif CG --mods m
+            python3 /methylartist/methylartist \
+            locus \
+            -i chr10:129466536-129467536 \
+            -b ${bam} \
+            --ref ${reference} \
+            --motif CG \
+            --mods m
             """
         else
 
@@ -203,7 +242,13 @@ process mosdepth {
 
     script:
         """
-        /mosdepth -t ${threads} -n --by ${targets} --fast-mode ${sample} ${input_bam}
+        /mosdepth \
+        -t ${threads} \
+        -n \
+        --by ${targets} \
+        --fast-mode \
+        ${sample} \
+        ${input_bam}
         """
 }
 
@@ -217,11 +262,14 @@ process index_subsetted_bam {
 
     script:
         """
-        samtools index -@${threads} ${input_bam}
+        samtools \
+        index \
+        -@${threads} \
+        ${input_bam}
         """
 }
 
-process human_variation_sv_methyl_cnv {
+process human_variation_mods {
     input:
         path(input_bam)
         path(targets_bed)
@@ -240,20 +288,85 @@ process human_variation_sv_methyl_cnv {
     script:
         """
         nextflow run epi2me-labs/wf-human-variation \
-            -with-report ${PWD}/${params.outdir}/human_variation_sv_methyl_cnv_nextflow_report.html \
-            -profile standard \
-            -w ${PWD}/${params.outdir}/workspace \
-            --ref ${reference} \
-            --sv \
-            --mod \
-            --cnv \
-            --bam ${input_bam} \
-            --bed ${targets_bed} \
-            --sample_name ${sample} \
-            --bam_min_coverage ${bam_min_coverage} \
-            --out_dir ${PWD}/${params.outdir} \
-            --threads ${threads}
+        -with-report ${PWD}/${params.outdir}/human_variation_mods_nextflow_report.html \
+        -profile standard \
+        -w ${PWD}/${params.outdir}/workspace \
+        --ref ${reference} \
+        --mod \
+        --bam ${input_bam} \
+        --bed ${targets_bed} \
+        --sample_name ${sample} \
+        --bam_min_coverage ${bam_min_coverage} \
+        --out_dir ${PWD}/${params.outdir} \
+        --threads ${threads}
         """ 
+}
+
+process human_variation_cnv {
+    input:
+        path(input_bam)
+        path(targets_bed)
+        path(reference)
+        val(sample)
+        val(outdir)
+        val(bam_min_coverage)
+        path(indexed_bam)
+        val(threads)
+
+    publishDir("${params.outdir}")
+
+    output:
+        val true
+
+    script:
+        """
+        nextflow run epi2me-labs/wf-human-variation \
+        -with-report ${PWD}/${params.outdir}/human_variation_cv_nextflow_report.html \
+        -profile standard \
+        -w ${PWD}/${params.outdir}/workspace \
+        --ref ${reference} \
+        --cnv \
+        --bam ${input_bam} \
+        --bed ${targets_bed} \
+        --sample_name ${sample} \
+        --bam_min_coverage ${bam_min_coverage} \
+        --out_dir ${PWD}/${params.outdir} \
+        --threads ${threads}
+        """
+}
+
+process human_variation_sv {
+    input:
+        path(input_bam)
+        path(targets_bed)
+        path(reference)
+        val(sample)
+        val(outdir)
+        val(bam_min_coverage)
+        path(indexed_bam)
+        val(threads)
+
+    publishDir("${params.outdir}")
+
+    output:
+        val true   
+
+    script:
+        """
+        nextflow run epi2me-labs/wf-human-variation \
+        -with-report ${PWD}/${params.outdir}/human_variation_sv_cnv_nextflow_report.html \
+        -profile standard \
+        -w ${PWD}/${params.outdir}/workspace \
+        --ref ${reference} \
+        --sv \
+        --bam ${input_bam} \
+        --bed ${targets_bed} \
+        --sample_name ${sample} \
+        --bam_min_coverage ${bam_min_coverage} \
+        --out_dir ${PWD}/${params.outdir} \
+        --threads ${threads} \
+        --sniffles_args="--non-germline"
+        """
 }
 
 process subset_bam_by_bed {
@@ -273,11 +386,81 @@ process subset_bam_by_bed {
         samtools view -@{threads} \
         -b \
         -h \
-        -L ${input_bed} ${input_bam} > ${sample}_subset.bam
+        -L ${input_bed} \
+        ${input_bam} \
+        > ${sample}_subset.bam
         """
- }
+}
 
- process human_variation_snp {
+process get_wanted_read_ids {
+    input:
+        path(subset_bam)
+        val(threads)
+
+    output:
+        path "temp_ids.txt", emit: wanted_ids
+
+    script:
+        """
+        samtools \
+        view \
+        -@${threads} \
+        ${subset_bam} \
+        | cut -f 1 \
+        > temp_ids.txt
+        """
+
+}
+
+process add_suppl_alignments_to_subset {
+    input:
+        path(subset_bam)
+        path(input_bam)
+        val(threads)
+        val(sample)
+        path(list_of_ids)
+
+    publishDir("${params.outdir}")
+
+    output:
+        path "*_subset.suppl.bam", emit: suppl_subset_bam
+
+    script:
+        """
+        samtools \
+        view \
+        -@${threads} \
+        -h \
+        -f 2048 \
+        -N ${list_of_ids} \
+        ${input_bam} \
+        | samtools \
+        merge \
+        -@${threads} \
+        -o ${sample}_subset.suppl.bam \
+        ${subset_bam} \
+        -
+        """
+}
+
+process index_suppl_subset_bam {
+    input:
+        path(input_bam)
+        val(threads)
+
+    output:
+        path "*.bai", emit: suppl_subset_indexed_bam
+
+    script:
+        """
+        samtools \
+        index \
+        -@${threads} \
+        ${input_bam}   
+        """ 
+}
+
+process human_variation_snp {
     input:
         path(input_bam)
         path(targets_bed)
@@ -294,17 +477,17 @@ process subset_bam_by_bed {
     script:
         """
         nextflow run epi2me-labs/wf-human-variation \
-            -with-report ${params.outdir}/human_variation_snp_nextflow_report.html \
-            -profile standard \
-            -w ${PWD}/${params.outdir}/workspace \
-            --ref ${reference} \
-            --snp \
-            --bam ${input_bam} \
-            --bed ${targets_bed} \
-            --sample_name ${sample} \
-            --bam_min_coverage ${bam_min_coverage} \
-            --out_dir ${PWD}/${params.outdir} \
-            --threads ${threads}
+        -with-report ${params.outdir}/human_variation_snp_nextflow_report.html \
+        -profile standard \
+        -w ${PWD}/${params.outdir}/workspace \
+        --ref ${reference} \
+        --snp \
+        --bam ${input_bam} \
+        --bed ${targets_bed} \
+        --sample_name ${sample} \
+        --bam_min_coverage ${bam_min_coverage} \
+        --out_dir ${PWD}/${params.outdir} \
+        --threads ${threads}
         """
  }
 
@@ -339,7 +522,7 @@ process subset_bam_by_bed {
         """
 }
 
- process cnvpytor {
+process cnvpytor {
     input:
         val(sample)
         path(input_bam)
@@ -367,7 +550,7 @@ process vcftools {
     errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return 'retry' }
 
     input:
-        val(ready) // human-variation sv, cnv, methyl
+        val(ready) // human-variation SNP module
         val(sample)
 
     output:
@@ -375,7 +558,8 @@ process vcftools {
 
     script:
         """
-        vcftools --gzvcf ${PWD}/${params.outdir}/${sample}.wf_snp.vcf.gz \
+        vcftools \
+        --gzvcf ${PWD}/${params.outdir}/${sample}.wf_snp.vcf.gz \
         --remove-filtered-all \
         --recode \
         --out ${sample}
@@ -391,7 +575,11 @@ process gzip {
 
     script:
         """
-        pigz -1 -c ${input_file} > ${input_file}.gz
+        pigz \
+        -1 \
+        -c \
+        ${input_file} \
+        > ${input_file}.gz
         """
 }
 
@@ -407,7 +595,8 @@ process bedtools_intersect {
         
     script:
         """
-        bedtools intersect \
+        bedtools \
+        intersect \
         -a ${input1} \
         -b ${input2} > ${output_file}${ext}
         """
@@ -427,7 +616,8 @@ process convert2annovar{
         /annovar/convert2annovar.pl \
         -format vcf4 ${input} \
         -withfreq \
-        -includeinfo > ${output_file}${ext}
+        -includeinfo \
+        > ${output_file}${ext}
         """
 }
 
@@ -473,8 +663,9 @@ process bedtools_intersect2 {
         
     script:
         """
-        bedtools intersect \
-        -a ${PWD}/${params.outdir}/${sample}.bed.gz \
+        bedtools \
+        intersect \
+        -a ${PWD}/${params.outdir}/${sample}.wf_mods.bedmethyl.gz \
         -b ${input2} > ${output_file}.${ext}
         """
 }
@@ -495,7 +686,7 @@ process mgmt_pred {
     script:
         cov_file = file("${params.outdir}/mgmt_avg_cov.txt")
         if ( cov_file.exists() == true )
-        """
+            """
             Rscript ${mgmt_pred} \
             --input ${intersect_bed} \
             --probes ${probes} \
@@ -503,7 +694,7 @@ process mgmt_pred {
             --out_dir ${PWD}/${params.outdir} \
             --sample ${sample} \
             --threads ${threads}
-        """
+            """
         else
             """
             """
@@ -530,7 +721,7 @@ process meth_classification {
         Rscript ${meth_class} \
         --sample ${sample} \
         --out_dir ${PWD}/${params.outdir} \
-        --in_file ${PWD}/${params.outdir}/${sample}.bed.gz \
+        --in_file ${PWD}/${params.outdir}/${sample}.wf_mods.bedmethyl.gz \
         --probes ${topprobes} \
         --training_data ${trainingdata} \
         --array_file ${arrayfile} \
@@ -563,6 +754,10 @@ process filter_report {
 }
 
 process make_report {
+
+    // cache false forces it to regenerate the report each time and not use the cache
+    cache false
+
     input:
         path(makereport)
         val(ready) // cnvpytor
@@ -573,71 +768,89 @@ process make_report {
         path(report_UKHD)
         path(mosdepth_plot_data) // mosdepth
         val(mgmt_cov)
-        val(sturgeon) // sturgeon has run
+        val(sturgeon) // sturgeon flag
+        val(sturgeon) // sturgeon channel indicator
         val(igv_reports) //igv_reports has run
+        val(nextflow_version)
+        path(input_bam)
+        val(seq)
     
     output:
 	val true
 
     script:
-        // if mgmt coverage was above thresh (and we have the data)
-        mgmt_status_file = file("${params.outdir}/mgmt_avg_cov.txt")
-        if ( mgmt_status_file.exists() == true )
-        
         """
-            Rscript ${makereport} \
-            --prefix ${sample} \
-            --mutations ${PWD}/${params.outdir}/${sample}_clair3_report.csv \
-            --cnv_plot ${PWD}/${params.outdir}/${sample}_cnvpytor_100k.global.0000.png \
-            --rf_details ${PWD}/${params.outdir}/${sample}_rf_details.tsv \
-            --votes ${PWD}/${params.outdir}/${sample}_votes.tsv \
-            --output_dir ${PWD}/${params.outdir} \
-            --patient ${sample} \
-            --coverage ${PWD}/${params.outdir}/${sample}.mosdepth.summary.txt \
-            --sample ${sample} \
-            --report_UKHD ${report_UKHD} \
-            --methylartist ${PWD}/${params.outdir}/*.chr10_129466536_129467536.m.ms1.smw20.locus.meth.png \
-            --mgmt ${PWD}/${params.outdir}/${sample}_mgmt_status.csv \
-            --sturgeon_csv ${PWD}/${params.outdir}/${sample}_sturgeon_scores.csv \
-            --sturgeon_pdf ${PWD}/${params.outdir}/${sample}_sturgeon_classification.pdf \
-            --igv_report ${PWD}/${params.outdir}/${sample}_igv-report.html \
-            --promoter_mgmt_coverage ${mgmt_cov}
-        """
-
-        // else, mgmt was below thresh and there is no data
+        # check for a specified sequencer, this overrides the checks below
+        if [ "${seq}" != "false" ]
+        then
+            seq=${seq}
         else
-            """
-            Rscript ${makereport} \
-            --prefix ${sample} \
-            --mutations ${PWD}/${params.outdir}/${sample}_clair3_report.csv \
-            --cnv_plot ${PWD}/${params.outdir}/${sample}_cnvpytor_100k.global.0000.png \
-            --rf_details ${PWD}/${params.outdir}/${sample}_rf_details.tsv \
-            --votes ${PWD}/${params.outdir}/${sample}_votes.tsv \
-            --output_dir ${PWD}/${params.outdir} \
-            --patient ${sample} \
-            --coverage ${PWD}/${params.outdir}/${sample}.mosdepth.summary.txt \
-            --sample ${sample} \
-            --report_UKHD ${report_UKHD} \
-            --sturgeon_csv ${PWD}/${params.outdir}/${sample}_sturgeon_scores.csv \
-            --sturgeon_pdf ${PWD}/${params.outdir}/${sample}_sturgeon_classification.pdf \
-            --igv_report ${PWD}/${params.outdir}/${sample}_igv-report.html \
-            --promoter_mgmt_coverage ${mgmt_cov}
-            """
+            # try to get the sequencer model from the @RG group (if it exists)
+            RG_seq=\$(samtools view -@4 -H ${input_bam} | grep ^@RG | grep -Po "PM:.*?\t" | awk '{print substr(\$NF,4,3)}')
+            # if found it, save as seq
+            if [ "\$RG_seq" ]
+            then 
+                seq=\$RG_seq
+            else
+            # if didn't find @RG, try for the fn:Z tag
+                FN_seq=\$(samtools view ${input_bam} | grep -Po "fn:Z:[F,P]" | head -n 1 | awk '{print substr(\$NF,6,6)}')        
+                # if found it, save as seq
+                if [ "\$FN_seq" ]
+                then
+                    seq=\$FN_seq
+                else
+                    # try the f5:Z tag
+                    F5_seq=\$(samtools view ${input_bam} | grep -Po "f5:Z:[F,P]" | head -n 1 | awk '{print substr(\$NF,6,6)}')
+                    if [ "\$F5_seq" ]
+                    then
+                        seq=\$F5_seq
+                    fi
+                fi
+            fi
+        fi
+        ## if all else fails, set it as unknown
+        if [ "${seq}" != "false" ]
+        then
+            seq="Unknown"
+        fi
+       
+        Rscript ${makereport} \
+        --prefix ${sample} \
+        --mutations ${PWD}/${params.outdir}/${sample}_clair3_report.csv \
+        --cnv_plot ${PWD}/${params.outdir}/${sample}_cnvpytor_100k.global.0000.png \
+        --rf_details ${PWD}/${params.outdir}/${sample}_rf_details.tsv \
+        --votes ${PWD}/${params.outdir}/${sample}_votes.tsv \
+        --output_dir ${PWD}/${params.outdir} \
+        --patient ${sample} \
+        --coverage ${PWD}/${params.outdir}/${sample}.mosdepth.summary.txt \
+        --sample ${sample} \
+        --report_UKHD ${report_UKHD} \
+        --methylartist ${PWD}/${params.outdir}/*.chr10_129466536_129467536.m.ms1.smw20.locus.meth.png \
+        --mgmt ${PWD}/${params.outdir}/${sample}_mgmt_status.csv \
+        --sturgeon ${sturgeon} \
+        --sturgeon_csv ${PWD}/${params.outdir}/${sample}_sturgeon_scores.csv \
+        --sturgeon_pdf ${PWD}/${params.outdir}/${sample}_sturgeon_classification.pdf \
+        --igv_report ${PWD}/${params.outdir}/${sample}_igv-report.html \
+        --nextflow_ver ${nextflow_version} \
+        --seq \${seq} \
+        --promoter_mgmt_coverage ${mgmt_cov}
+        """
 }
-
 
 process STURGEON_modkit_extract {
     input:
         path(mod_merged_bam)
         val(sample)
         val(threads)
+        path(merged_bam_index) // not passed but in same loc as the input file below
 
     output:
         path "*_modkit_output.txt", emit: modkit_extract_output
 
     script:
         """
-        /modkit extract \
+        /modkit \
+        extract \
         ${mod_merged_bam} \
         ${sample}_modkit_output.txt \
         --threads ${threads}
@@ -655,7 +868,8 @@ process STURGEON_inputtobed {
     script:
         """
         source /sturgeon-0.4.2/venv/bin/activate
-        sturgeon inputtobed \
+        sturgeon \
+        inputtobed \
         --reference-genome hg38 \
         -i ${modkit_out} \
         -o ${params.outdir} \
@@ -674,7 +888,8 @@ process STURGEON_predict {
     script:
         """
         source /sturgeon-0.4.2/venv/bin/activate
-        sturgeon predict \
+        sturgeon \
+        predict \
         -i  ${input_bed} \
         -o ${PWD}/${params.outdir} \
         --model-files /sturgeon-0.4.2/sturgeon/include/models/CAPPER_MODEL.zip \
@@ -693,8 +908,10 @@ process STURGEON_rename {
 
     script:
         """
-        mv ${PWD}/${params.outdir}/merged_probes_methyl_calls_CAPPER_MODEL.pdf ${PWD}/${params.outdir}/${sample}_sturgeon_classification.pdf
-        mv ${PWD}/${params.outdir}/merged_probes_methyl_calls_CAPPER_MODEL.csv ${PWD}/${params.outdir}/${sample}_sturgeon_scores.csv
+        mv ${PWD}/${params.outdir}/merged_probes_methyl_calls_CAPPER_MODEL.pdf \
+        ${PWD}/${params.outdir}/${sample}_sturgeon_classification.pdf
+        mv ${PWD}/${params.outdir}/merged_probes_methyl_calls_CAPPER_MODEL.csv \
+        ${PWD}/${params.outdir}/${sample}_sturgeon_scores.csv
         """
 }
 
@@ -704,9 +921,10 @@ process STURGEON_rename {
 
 workflow {
 
-///////////////////// - read all input parameters
+    // Read all input parameters
 
-///////////////////// - read user defined parameters
+    // User defined parameters
+
     Channel.fromPath(params.bam, checkIfExists: true)
     .set {input_bam}
 
@@ -731,8 +949,7 @@ workflow {
     Channel.fromPath(params.annotations, checkIfExists: true)
     .set {annotations}
 
-
-///////////////////// - read required scripts and files from bin/
+    // Collect variables and scripts from bin
 
     Channel.fromPath("${projectDir}/bin/NPHD_panel_hg38_clean.bed", checkIfExists: true)
     .set {targets}
@@ -764,13 +981,14 @@ workflow {
     Channel.fromPath("${projectDir}/bin/filter_report_v0.1.R", checkIfExists: true)
     .set {filterreport}
 
-    Channel.fromPath("${projectDir}/bin/make_report_v0.3.R", checkIfExists: true)
+    Channel.fromPath("${projectDir}/bin/make_report_v0.4.R", checkIfExists: true)
     .set {makereport}
 
-    Channel.fromPath("${projectDir}/bin/Rapid_CNS2_report_UKHD_v0.4.Rmd", checkIfExists: true)
+    Channel.fromPath("${projectDir}/bin/Rapid_CNS2_report_UKHD_v0.5.Rmd", checkIfExists: true)
     .set {report_UKHD}
 
-///////////////////// - run the workflow
+    // WORKFLOW
+
     // check input bam file for methylation tags
     check_ch = check_bam_has_meth_data(input_bam, threads)
 
@@ -783,11 +1001,9 @@ workflow {
     // index the merged bam file 
     merged_index_ch = index_merged_bam(modkit_adjust_ch.modkit_merged_bam, threads)
 
-    if ( params.nanoplot != null) {
-
-    // generate NanoPlot QC Report
-    nanoplot(input_bam, threads, sample, index_ch.indexed_bam)
-
+    if ( params.nanoplot != false) {
+        // generate NanoPlot QC Report
+        nanoplot(input_bam, threads, sample, index_ch.indexed_bam)
     }
 
     // check the coverage of the mgmt region in the sequence data
@@ -800,14 +1016,29 @@ workflow {
     // mosdepth coverage plots
     mosdepth_ch = mosdepth(threads, targets, input_bam, sample, index_ch.indexed_bam)
 
-    // call and run the epi2me-labs/wf-human-variation
-    human_variation_sv_methyl_cnv(modkit_adjust_ch.modkit_merged_bam, targets, reference, sample, outdir, 1, merged_index_ch.indexed_bam, threads)
-
     // subset the input bam file by the bed file - to speed up the SNP portion of human-variation
     subsetted_bam_ch = subset_bam_by_bed(modkit_adjust_ch.modkit_merged_bam, targets, sample, threads)
 
     // index the subsetted bam generated above
     index_subsetted_bam(subsetted_bam_ch.subsetted_bam, threads)
+
+    // get the read IDs out of the subsetted bam, find all alignmnets associated with IDs and merge them back in
+    wanted_ids_ch = get_wanted_read_ids(subsetted_bam_ch.subsetted_bam, threads)
+
+    // using the wanted IDs, pull out the supplementary alignments from the input bam and merge them into the subsetted bam
+    subset_suppl_bam_ch = add_suppl_alignments_to_subset(subsetted_bam_ch.subsetted_bam, input_bam, threads, sample, wanted_ids_ch.wanted_ids)
+
+    // index the subsetted bam with the suppl reads added back in
+    index_suppl_subset_bam_ch=index_suppl_subset_bam(subset_suppl_bam_ch.suppl_subset_bam, threads)
+
+    // call and run the epi2me-labs/wf-human-variation : mods
+    human_variation_mods(modkit_adjust_ch.modkit_merged_bam, targets, reference, sample, outdir, 1, merged_index_ch.indexed_bam, threads)
+
+    // call and run the epi2me-labs/wf-human-variation : sv
+    human_variation_sv(subset_suppl_bam_ch.suppl_subset_bam, targets, reference, sample, outdir, 1, index_suppl_subset_bam_ch.suppl_subset_indexed_bam, threads)
+
+    // call and run the epi2me-labs/wf-human-variation : cnv
+    human_variation_cnv(input_bam, targets, reference, sample, outdir, 1, index_ch.indexed_bam, threads)
 
     // run the SNP human variation workflow on the subsetted bam
     human_variation_snp(subsetted_bam_ch.subsetted_bam, targets, reference, sample, outdir, 1, index_subsetted_bam.out, threads)
@@ -831,43 +1062,42 @@ workflow {
     clair3_annovar_ch = table_annovar(converted_annovar_ch.annovar_input, 'hg38', sample, '_clair3_panel', threads)
 
     // run bedtools intersect
-    intersect_bed_ch = bedtools_intersect2(human_variation_sv_methyl_cnv.out, mgmt_bed, 'mgmt_5mC.hg38', 'bed', sample)
+    intersect_bed_ch = bedtools_intersect2(human_variation_mods.out, mgmt_bed, 'mgmt_5mC.hg38', 'bed', sample)
 
     // run the mgmt_pred script
     mgmt_pred_ch = mgmt_pred(mgmt_pred, intersect_bed_ch.intersect_bed, probes, model, sample, params.outdir, threads)
    
     // run the meth classification script
-    meth_classification(meth_class, sample, params.outdir, topprobes, trainingdata, arrayfile, threads, human_variation_sv_methyl_cnv.out)
+    meth_classification(meth_class, sample, params.outdir, topprobes, trainingdata, arrayfile, threads, human_variation_mods.out)
     
     // collect report data and generate report
     filter_report(filterreport, clair3_annovar_ch.clair3_output, sample, params.outdir)  
 
-    // produce igv_report for each SNP in the clair3 report
+    //  produce igv_report for each SNP in the clair3 report
     igv_reports(filter_report.out, sample, reference, input_bam, index_ch.indexed_bam, annotations)
 
-    if ( params.sturgeon != null) {
+   // STURGEON section
 
-    // sturgeon section
-    ///////////////////////////////////
+    if ( params.sturgeon != false) {
 
-    // modkit extract values
-    modkit_extract_ch = STURGEON_modkit_extract(modkit_adjust_ch.modkit_merged_bam, sample, threads)
+        // modkit extract values
+        modkit_extract_ch = STURGEON_modkit_extract(modkit_adjust_ch.modkit_merged_bam, sample, threads, merged_index_ch.indexed_bam)
 
-    // sturgeon convert input to bed file
-    sturgeon_inputtobed_ch = STURGEON_inputtobed(modkit_extract_ch.modkit_extract_output, params.outdir)
+        // sturgeon convert input to bed file
+        sturgeon_inputtobed_ch = STURGEON_inputtobed(modkit_extract_ch.modkit_extract_output, params.outdir)
 
-    // sturgeon predict
-    STURGEON_predict(sturgeon_inputtobed_ch.sturgeon_bed_convert)
+        // sturgeon predict
+        STURGEON_predict(sturgeon_inputtobed_ch.sturgeon_bed_convert)
 
-    // sturgeon rename
-    STURGEON_rename(STURGEON_predict.out, sample)
-    
-    // generate report inc. sturgeon
-    make_report(makereport, cnvpytor.out, mgmt_pred.out, meth_classification.out, filter_report.out, sample, report_UKHD, mosdepth_ch.mosdepth_out, mgmt_coverage_ch.mgmt_avg_cov, STURGEON_predict.out, igv_reports.out)
+        // sturgeon rename
+        STURGEON_rename(STURGEON_predict.out, sample)
+
+        // generate report inc. sturgeon
+        make_report(makereport, cnvpytor.out, mgmt_pred.out, meth_classification.out, filter_report.out, sample, report_UKHD, mosdepth_ch.mosdepth_out, mgmt_coverage_ch.mgmt_avg_cov, params.sturgeon, STURGEON_predict.out, igv_reports.out, nextflow_version, input_bam, params.seq)
 
     } else {
-
-    // collect data and generate final report - no sturgeon
-    make_report(makereport, cnvpytor.out, mgmt_pred.out, meth_classification.out, filter_report.out, sample, report_UKHD, mosdepth_ch.mosdepth_out, mgmt_coverage_ch.mgmt_avg_cov, "NULL", igv_reports.out)
+        // collect data and generate final report - no sturgeon
+        make_report(makereport, cnvpytor.out, mgmt_pred.out, meth_classification.out, filter_report.out, sample, report_UKHD, mosdepth_ch.mosdepth_out, mgmt_coverage_ch.mgmt_avg_cov, params.sturgeon, "NULL", igv_reports.out, nextflow_version, input_bam, params.seq)
     }
 }
+
