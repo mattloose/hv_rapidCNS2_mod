@@ -11,7 +11,7 @@ The provided reference should be the same reference used to align reads in the i
 
 At present, it relies upon the *outdir* being within the current working directory. Setting a full path to some other location will cause errors.
 
-### Latest updates in v0.8.1:
+### Latest updates in v.0.8.1:
 - wf-human-variation "--mod" module uses the BAM file with the merged mods
 - wf-human-variation "--snp" uses the raw BAM subsetted to just the target regions
 - wf-human-variation "--sv" use the subsetted BAM, which has all associated supplementary alignments retained
