@@ -54,7 +54,7 @@ log.info """\
         - hv_rapidCNS2 workflow version number now included in the final report
         - sequencer information derived from input BAM and included in report (can be specified with --seq)
         Changes in v0.8.2:
-        MGMT coverage, methylation status, and methylation plot now correctly displayed in lite and full reports       
+        - MGMT coverage, methylation status, and methylation plot now correctly displayed in lite and full reports       
          ================================================================
 
         """
