@@ -10,7 +10,6 @@ nextflow_version="v.0.8.2"
 // default behaviour is to NOT:
 // run sturgeon classifier 
 // run NanoPlot
-// embed the igv-report into the final report
 
 // default the various optional parameters to false
 params.sturgeon = false
