@@ -5,7 +5,7 @@ nextflow.enable.dsl=2
 outdir = file(params.outdir)
 outdir.mkdir()
 
-nextflow_version="v.0.8.1"
+nextflow_version="v.0.8.2"
 
 // default behaviour is to NOT:
 // run sturgeon classifier 
@@ -53,7 +53,9 @@ log.info """\
         - two versions of the output report are created; a lite v with a simple mutations table and a full v with interactive igvreport
         - hv_rapidCNS2 workflow version number now included in the final report
         - sequencer information derived from input BAM and included in report (can be specified with --seq)
-        ================================================================
+        Changes in v0.8.2:
+        MGMT coverage, methylation status, and methylation plot now correctly displayed in lite and full reports       
+         ================================================================
 
         """
         .stripIndent()
@@ -119,8 +121,6 @@ process index_merged_bam {
     input:
         path(input_bam)
         val(threads)
-
-    publishDir("${params.outdir}")
 
     output:
         path "*.bai", emit: indexed_bam
@@ -842,7 +842,6 @@ process STURGEON_modkit_extract {
         path(mod_merged_bam)
         val(sample)
         val(threads)
-        path(merged_bam_index) // not passed but in same loc as the input file below
 
     output:
         path "*_modkit_output.txt", emit: modkit_extract_output
@@ -1081,7 +1080,7 @@ workflow {
     if ( params.sturgeon != false) {
 
         // modkit extract values
-        modkit_extract_ch = STURGEON_modkit_extract(modkit_adjust_ch.modkit_merged_bam, sample, threads, merged_index_ch.indexed_bam)
+        modkit_extract_ch = STURGEON_modkit_extract(modkit_adjust_ch.modkit_merged_bam, sample, threads)
 
         // sturgeon convert input to bed file
         sturgeon_inputtobed_ch = STURGEON_inputtobed(modkit_extract_ch.modkit_extract_output, params.outdir)

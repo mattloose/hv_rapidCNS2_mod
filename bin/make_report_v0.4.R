@@ -95,6 +95,7 @@ if (opt$sturgeon == "true"){
 inc_igvreport = FALSE
 exc_igvreport = TRUE
 # lite version
+mgmt = "true"
 render(report_UKHD, 
        output_format = "html_document", 
        output_dir = opt$output_dir,

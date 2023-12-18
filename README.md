@@ -19,6 +19,8 @@ At present, it relies upon the *outdir* being within the current working directo
 - two versions of the output report are created; a lite v with a simple mutations table and a full v with interactive igvreport
 - hv_rapidCNS2 workflow version number now included in the final report
 - sequencer information derived from input BAM and included in report (can be specified with --seq)
+- Updaate in v0.8.2:
+- MGMT coverage, methylation status, and methylation plot now correctly displayed in lite and full reports
 
 ### Requirements:
 ```
