@@ -33,9 +33,9 @@ nextflow
 docker pull graefox/rapid_cns2:latest
 ```
 
-### pull/clone latest version of workflow, and required dependencies
+### pull latest version of workflow, and required dependencies
 ```
-git clone https://github.com/graemefox/hv_rapidCNS2.git
+nextflow pull graemefox/hv_rapidCNS2
 nextflow pull epi2me-labs/wf-human-variation
 ```
 
@@ -53,7 +53,7 @@ ANNOTATIONS=my_annotation_set.gtf
 
 ## run the pipeline
 
-nextflow run hv_rapidCNS2/main.nf \
+nextflow run graemefox/hv_rapidCNS2 \
 -with-docker graefox/rapid_cns2:latest \
 -with-report ${OUTPUT_DIR}/${SAMPLE}_nextflow_report.html \
 --sample ${SAMPLE} \
