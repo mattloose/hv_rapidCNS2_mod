@@ -30,8 +30,8 @@ mgmt_meth <- subset(mgmt_meth, V2 %in% pred_pos)
 ## temp file added to check effect of na.rm added below
 #write.csv(mgmt_meth,file=paste0(opt$out_dir,"/",opt$sample,"_mgmt_meth_to_check.csv"),row.names = T)
 ## na.rm=T added by GF
-#mgmt_average <- mean(mgmt_meth$V11, na.rm=T)
-mgmt_average <- mean(t(as.numeric(as.data.frame(strsplit(mgmt_meth$V10, ' ', fixed=TRUE))[2,])), na.rm=T)
+mgmt_average <- mean(mgmt_meth$V11, na.rm=T)
+#mgmt_average <- mean(t(as.numeric(as.data.frame(strsplit(mgmt_meth$V10, ' ', fixed=TRUE))[2,])), na.rm=T)
 #mgmt_average <- mean(mgmt_meth$V11)
 mgmt <- data.frame(average=mgmt_average)
 #pred <- predict(log.model,newdata = mgmt,type = "response")
