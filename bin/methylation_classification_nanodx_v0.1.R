@@ -34,8 +34,8 @@ dir.create(file.path(opt$out_dir), showWarnings = FALSE)
 meth <- read.delim(opt$in_file,header=FALSE)
 
 #Keep relevant columns
-#meth_filter <- meth[,c(1:3,6,10:11)]
-meth_filter <- as.data.frame(cbind(meth[,c(1:3,6)], t(as.data.frame(strsplit(meth$V10, " ")))[,1:2]))
+meth_filter <- meth[,c(1:3,6,10:11)]
+#meth_filter <- as.data.frame(cbind(meth[,c(1:3,6)], t(as.data.frame(strsplit(meth$V10, " ")))[,1:2]))
 
 rm(meth)
 
@@ -110,7 +110,7 @@ Dx_fractions <- min(summary(ts$Dx,maxsum=10000)) / summary(ts$Dx,maxsum=10000)
 
 #rf <- ranger(dependent.variable.name = "Dx", data = ts[,cols], num.trees=20000, probability = T, sample.fraction = Dx_fractions,verbose=TRUE,num.threads=16)
 
-rf <- ranger(dependent.variable.name = "Dx", data = ts[,c(cols,"Dx")], num.trees=20000, probability = T, sample.fraction = Dx_fractions,verbose=TRUE,num.threads=opt$threads)
+rf <- ranger(dependent.variable.name = "Dx", data = ts[,c(cols,"Dx")], num.trees=2000, probability = T, sample.fraction = Dx_fractions,verbose=TRUE,num.threads=opt$threads)
 
 probs <- predict(rf, ts, predict.all = F)$predictions
 scores <- unlist(lapply(1:dim(probs)[1], function(i){probs[i,which(probs[i,] == max(probs[i,]))]}))
